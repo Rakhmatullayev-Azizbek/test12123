@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EISVO LLM OCR</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #fff; --text: #16181d; --muted: #667085;
+    --border: #e4e7ec; --accent: #2454db;
+    --ok: #157f3d; --ok-bg: #eaf6ef; --ok-line: #abd8bc;
+    --bad: #b42020; --bad-bg: #fdeeee; --bad-line: #f0b6b6;
+    --warn: #92510e; --warn-bg: #fdf3e2; --warn-line: #ecc994;
+    --na: #58606e; --na-bg: #eef0f3; --na-line: #d3d8df;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101318; --card: #191d24; --text: #e8eaee; --muted: #98a1b0;
+      --border: #2a303a; --accent: #7fa3ff;
+      --ok: #7fd49a; --ok-bg: #12291a; --ok-line: #235c37;
+      --bad: #f29a9a; --bad-bg: #331616; --bad-line: #6e2626;
+      --warn: #ecc37f; --warn-bg: #33260f; --warn-line: #6e5320;
+      --na: #aab3c0; --na-bg: #232833; --na-line: #3a4250;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 21px; margin: 0 0 2px; }
+  .sub { color: var(--muted); margin-bottom: 18px; font-size: 13px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 14px; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: end; }
+  .field { flex: 1; min-width: 230px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  input[type=file] { width: 100%; padding: 8px; border: 1px dashed var(--border); border-radius: 8px; background: var(--bg); font-size: 13px; color: var(--text); }
+  button.primary { background: var(--accent); color: #fff; border: 0; padding: 10px 24px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  button.primary:disabled { opacity: .5; cursor: default; }
+  .health { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+  .spinner { display: none; margin: 26px auto 8px; width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #status-msg { text-align: center; color: var(--muted); font-size: 13px; }
+
+  /* verdict banner */
+  .verdict { border-radius: 12px; padding: 20px 22px; margin-bottom: 14px; border: 1px solid; }
+  .verdict.v-bad { background: var(--bad-bg); border-color: var(--bad-line); }
+  .verdict.v-ok { background: var(--ok-bg); border-color: var(--ok-line); }
+  .verdict .word { font-size: 30px; font-weight: 800; letter-spacing: .04em; }
+  .verdict.v-bad .word { color: var(--bad); }
+  .verdict.v-ok .word { color: var(--ok); }
+  .verdict .expl { color: var(--text); font-size: 14px; margin-top: 2px; }
+
+  /* KPI tiles */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 14px; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .kpi b { display: block; font-size: 30px; font-weight: 800; line-height: 1.15; }
+  .kpi span { font-size: 12.5px; color: var(--muted); font-weight: 600; letter-spacing: .02em; }
+  .kpi.k-ok b { color: var(--ok); } .kpi.k-bad b { color: var(--bad); }
+
+  /* tabs */
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 2px 0 12px; }
+  .tab { border: 1px solid var(--border); background: var(--card); color: var(--text);
+         border-radius: 999px; padding: 7px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  td.val { word-break: break-word; max-width: 330px; }
+  .fname { font-weight: 650; font-family: ui-monospace, monospace; font-size: 12.5px; }
+  .fdesc { color: var(--muted); font-size: 12px; margin-top: 1px; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px;
+           font-size: 11.5px; font-weight: 700; letter-spacing: .04em; border: 1px solid; white-space: nowrap; }
+  .b-match     { color: var(--ok);   background: var(--ok-bg);   border-color: var(--ok-line); }
+  .b-mismatch  { color: var(--bad);  background: var(--bad-bg);  border-color: var(--bad-line); }
+  .b-unknown   { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
+  .b-missing   { color: var(--na);   background: var(--na-bg);   border-color: var(--na-line); }
+  .b-low       { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
+  .b-failed    { color: var(--bad);  background: var(--bad-bg);  border-color: var(--bad-line); }
+  .b-high      { color: var(--ok);   background: var(--ok-bg);   border-color: var(--ok-line); }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+  pre { background: var(--bg); border-radius: 8px; padding: 12px; overflow-x: auto; font-size: 12px; }
+  .err { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad-line); padding: 12px 16px; border-radius: 8px; display: none; margin-bottom: 14px; }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  .empty { color: var(--muted); text-align: center; padding: 18px; font-size: 13.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>EISVO LLM OCR</h1>
+  <div class="sub">Shartnoma PDF'idan ma'lumot ajratish va EISVO API JSON'i bilan taqqoslash</div>
+
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label>Shartnoma PDF *</label>
+        <input type="file" id="pdf" accept=".pdf">
+      </div>
+      <div class="field">
+        <label>EISVO API JSON (ixtiyoriy)</label>
+        <input type="file" id="apijson" accept=".json,application/json">
+      </div>
+      <div><button class="primary" id="run">Tekshirish</button></div>
+    </div>
+    <div class="health" id="health">Serverlar holati tekshirilyapti…</div>
+  </div>
+
+  <div class="err" id="err"></div>
+  <div class="spinner" id="spin"></div>
+  <div id="status-msg"></div>
+  <div id="results"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "—").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const BADGES = {
+  match:       ['b-match',    '✓', 'MATCH'],
+  mismatch:    ['b-mismatch', '✗', 'MISMATCH'],
+  unknown_code:['b-unknown',  '?', "NOMA'LUM KOD"],
+  missing_pdf: ['b-missing',  '·', "PDFDA YO'Q"],
+  missing_api: ['b-missing',  '·', "APIDA YO'Q"],
+  high:        ['b-high',     '✓', 'HIGH'],
+  low:         ['b-low',      '!', 'LOW'],
+  failed:      ['b-failed',   '✗', 'FAILED'],
+};
+const badge = (s) => {
+  const [cls, icon, label] = BADGES[s] || ['b-missing', '·', String(s).toUpperCase()];
+  return `<span class="badge ${cls}">${icon} ${label}</span>`;
+};
+
+const FIELD_LABELS = {
+  "contract_number": "Shartnoma raqami", "contract_date": "Shartnoma sanasi",
+  "currency": "Shartnoma valyutasi", "total_amount": "Shartnoma umumiy summasi",
+  "seller.name": "Sotuvchi nomi", "seller.country": "Sotuvchi davlati",
+  "seller.address": "Sotuvchi manzili", "seller.inn": "Sotuvchi INN",
+  "seller.bank.name": "Sotuvchi banki", "seller.bank.swift": "Sotuvchi bank SWIFT",
+  "seller.bank.account": "Sotuvchi hisob raqami", "seller.bank.mfo": "Sotuvchi bank MFO",
+  "seller.bank.attributes": "Sotuvchi bank rekvizitlari (SWIFT + hisob)",
+  "buyer.name": "Xaridor nomi", "buyer.country": "Xaridor davlati",
+  "buyer.address": "Xaridor manzili", "buyer.inn": "Xaridor INN",
+  "buyer.bank.name": "Xaridor banki", "buyer.bank.swift": "Xaridor bank SWIFT",
+  "buyer.bank.account": "Xaridor hisob raqami", "buyer.bank.mfo": "Xaridor bank MFO",
+  "buyer.bank.attributes": "Xaridor bank rekvizitlari (SWIFT + hisob)",
+  "delivery.place": "Yetkazib berish joyi", "delivery.incoterms": "Incoterms sharti",
+};
+const PROD_LABELS = { name: "nomi", hs_code: "HS/TN VED kodi", unit: "o'lchov birligi",
+                      quantity: "miqdori", price: "birlik narxi", amount: "summasi" };
+
+async function health() {
+  try {
+    const h = await (await fetch("/api/health")).json();
+    const dot = ok => `<span class="dot" style="background:${ok ? "var(--ok)" : "var(--bad)"}"></span>`;
+    $("health").innerHTML =
+      `${dot(h.surya)}Surya OCR server &nbsp;&nbsp; ${dot(h.llm)}Qwen3 LLM server` +
+      ((!h.surya || !h.llm) ? ` &nbsp;<i>(server hali tayyor emas — model yuklanmoqda)</i>` : "");
+  } catch { $("health").textContent = "Backend'ga ulanib bo'lmadi"; }
+}
+health(); setInterval(health, 15000);
+
+$("run").onclick = async () => {
+  const pdf = $("pdf").files[0];
+  if (!pdf) { alert("PDF tanlang"); return; }
+  const fd = new FormData();
+  fd.append("pdf", pdf);
+  if ($("apijson").files[0]) fd.append("api_json", $("apijson").files[0]);
+
+  $("err").style.display = "none"; $("results").innerHTML = "";
+  $("spin").style.display = "block"; $("run").disabled = true;
+  $("status-msg").textContent = "OCR + LLM ishlayapti — sahifalar soniga qarab 1-5 daqiqa…";
+  try {
+    const r = await fetch("/api/process", { method: "POST", body: fd });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
+    render(await r.json());
+  } catch (e) {
+    $("err").textContent = "Xato: " + e.message; $("err").style.display = "block";
+  } finally {
+    $("spin").style.display = "none"; $("run").disabled = false; $("status-msg").textContent = "";
+  }
+};
+
+// comparison natijasini yagona qatorlar ro'yxatiga yig'ish (maydonlar + tovarlar)
+function buildRows(d) {
+  const rows = [];
+  for (const [k, f] of Object.entries(d.comparison.fields)) {
+    rows.push({ key: k, desc: FIELD_LABELS[k] || "", pdf: f.pdf, api: f.api,
+                status: f.status, ocr: f.ocr_confidence });
+  }
+  const p = d.comparison.products;
+  p.rows.forEach((r, i) => {
+    const nm = r.pdf?.name ? ` (${r.pdf.name})` : "";
+    if (!r.api) {
+      rows.push({ key: `products[${i}]`, desc: `Tovar ${i + 1}${nm} — APIda topilmadi`,
+                  pdf: r.pdf?.name, api: null, status: "mismatch" });
+      return;
+    }
+    const apiVals = { name: r.api.itemsName, hs_code: r.api.tnCode, unit: r.api.unitCode,
+                      quantity: r.api.quantity, price: r.api.cost, amount: r.api.amount };
+    for (const [fk, fv] of Object.entries(r.fields)) {
+      rows.push({ key: `products[${i}].${fk}`,
+                  desc: `Tovar ${i + 1}${nm} — ${PROD_LABELS[fk] || fk}`,
+                  pdf: r.pdf?.[fk], api: apiVals[fk], status: fv.status });
+    }
+  });
+  p.unmatched_api.forEach((g, i) => {
+    rows.push({ key: `api_goods[${i}]`, desc: `APIdagi tovar (${g.itemsName}) — PDFda topilmadi`,
+                pdf: null, api: g.itemsName, status: "missing_pdf" });
+  });
+  if (p.totals && p.totals.status !== "missing") {
+    rows.push({ key: "products.jami", desc: "Tovarlar jami summasi",
+                pdf: p.totals.pdf_sum, api: p.totals.api_sum, status: p.totals.status });
+  }
+  return rows;
+}
+
+let allRows = [], curFilter = "mismatch";
+
+function renderTable() {
+  const groups = {
+    mismatch: allRows.filter(r => r.status === "mismatch"),
+    match: allRows.filter(r => r.status === "match"),
+    all: allRows,
+  };
+  const rows = groups[curFilter] || allRows;
+  const tabs = [
+    ["mismatch", `Nomuvofiqlar ${groups.mismatch.length}`],
+    ["match", `Mosliklar ${groups.match.length}`],
+    ["all", `Hammasi ${allRows.length}`],
+  ].map(([k, t]) =>
+    `<button class="tab ${curFilter === k ? "active" : ""}" onclick="setFilter('${k}')">${t}</button>`
+  ).join("");
+
+  const body = rows.length ? rows.map(r => `
+    <tr>
+      <td><div class="fname">${esc(r.key)}</div><div class="fdesc">${esc(r.desc)}</div></td>
+      <td class="val">${esc(r.pdf)}</td>
+      <td class="val">${esc(r.api)}</td>
+      <td>${badge(r.status)}${r.ocr && r.ocr !== "high" ? " " + badge(r.ocr) : ""}</td>
+    </tr>`).join("")
+    : `<tr><td colspan="4"><div class="empty">Bu bo'limda qatorlar yo'q</div></td></tr>`;
+
+  $("cmp-area").innerHTML = `
+    <div class="tabs">${tabs}</div>
+    <div class="card" style="padding:4px 6px">
+      <table>
+        <tr><th>Maydon</th><th>VLM (PDF)</th><th>API (JSON)</th><th>Holat</th></tr>
+        ${body}
+      </table>
+    </div>`;
+}
+function setFilter(f) { curFilter = f; renderTable(); }
+
+function render(d) {
+  let html = "";
+  const hasCmp = !!d.comparison;
+
+  if (hasCmp) {
+    allRows = buildRows(d);
+    const nBad = allRows.filter(r => r.status === "mismatch").length;
+    const nOk = allRows.filter(r => r.status === "match").length;
+    const checked = nBad + nOk;
+    const verdict = nBad > 0 ? "bad" : "ok";
+    html += `<div class="verdict v-${verdict}">
+      <div class="word">${verdict === "bad" ? "MISMATCH" : "MATCH"}</div>
+      <div class="expl">${verdict === "bad"
+        ? "Shartnomada nomuvofiqliklar topildi"
+        : "Shartnoma API ma'lumotlariga mos"}</div>
+    </div>`;
+    html += `<div class="kpis">
+      <div class="kpi"><b>${checked}</b><span>Tekshirildi</span></div>
+      <div class="kpi k-ok"><b>${nOk}</b><span>Mos keldi</span></div>
+      <div class="kpi k-bad"><b>${nBad}</b><span>Mos kelmadi</span></div>
+    </div>`;
+    html += `<div id="cmp-area"></div>`;
+    curFilter = nBad > 0 ? "mismatch" : "all";
+  } else {
+    const v = d.validation?.summary || {};
+    const verdict = (v.failed ?? 0) === 0 ? "ok" : "bad";
+    html += `<div class="verdict v-${verdict}">
+      <div class="word">${verdict === "ok" ? "OK" : "DIQQAT"}</div>
+      <div class="expl">API JSON berilmadi — faqat extraction natijasi. OCR ishonch: ${esc(v.overall)}</div>
+    </div>`;
+    html += `<div class="kpis">
+      <div class="kpi k-ok"><b>${v.high ?? 0}</b><span>Ishonchli maydon</span></div>
+      <div class="kpi"><b>${v.low ?? 0}</b><span>Past ishonch</span></div>
+      <div class="kpi k-bad"><b>${v.failed ?? 0}</b><span>Topilmadi/xato</span></div>
+    </div>`;
+  }
+
+  // validator ogohlantirishlari
+  const vf = d.validation?.fields || {};
+  const bad = Object.entries(vf).filter(([, f]) => f.confidence !== "high");
+  if (bad.length) {
+    const rows = bad.map(([k, f]) => `
+      <tr>
+        <td><div class="fname">${esc(k)}</div><div class="fdesc">${esc(FIELD_LABELS[k] || "")}</div></td>
+        <td class="val">${esc(f.value)}</td>
+        <td>${badge(f.confidence)}</td>
+        <td class="val">${esc((f.issues || []).join("; "))}</td>
+      </tr>`).join("");
+    html += `<div class="card"><h2>OCR/Validator ogohlantirishlari</h2>
+      <table><tr><th>Maydon</th><th>Qiymat</th><th>Ishonch</th><th>Izoh</th></tr>${rows}</table></div>`;
+  }
+
+  html += `<div class="card">
+    <details><summary>Ajratilgan ma'lumot (JSON)</summary>
+      <pre>${esc(JSON.stringify(d.extracted, null, 2))}</pre></details>
+    <details><summary>OCR Markdown</summary><pre>${esc(d.markdown)}</pre></details>
+  </div>`;
+
+  $("results").innerHTML = html;
+  if (hasCmp) renderTable();
+}
+</script>
+</body>
+</html>

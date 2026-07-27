@@ -1,0 +1,157 @@
+{
+  "status": 0,
+  "errorMsg": "OK",
+  "timeStamp": "2026-07-21T13:52:49.175+00:00",
+  "gtkId": 2121212121,
+  "contract": {
+    "idn": "67348820912237918121",
+    "cntrType": "02",
+    "bankId": "21212",
+    "bankInn": "212121212",
+    "okpo": "1",
+    "okonx": null,
+    "contractorUzName": "SAMANDAR PLAST SERVIS MCHJ",
+    "rgnCode": "18",
+    "contractorUzAddress": "Andijon viloyati Urgut tumani Urgut erkin iqtisodiy zonasi hududi Qorgontepa massivi",
+    "contractorUzPhone": "",
+    "cntrSubject": 1,
+    "currCode1": "840",
+    "currCode2": null,
+    "amount1": 126714.9,
+    "amount2": 0,
+    "accCurrCode1": "840",
+    "contractorForName": "CHINA Jiagang VIVA IMP. AND EXP. CO.,LTD.",
+    "contractorForCountryCode": "156",
+    "contractorForAddress": "NO.3 JINXIU ROAD,YANGZI INTERNATIONAL METALIC INDUSTRY ZONE,JINFEGN Town,Zhang Jiagang, Jiangsu, China",
+    "bankForName": "Agricultural bank of China suzhou branch",
+    "bankForCountryCode": "156",
+    "bankForAddress": "HONkONG, China",
+    "bankForAttributes": "SWIFТ:3232323DDD\nAccount number:2324122",
+    "productsName": null,
+    "docNo": "258",
+    "docDate": "2026-03-17",
+    "cntrStatus": 0,
+    "status": 0,
+    "contractorUzInn": "434323232",
+    "receivableTotal1": 30500,
+    "insTime": "2026-03-18T10:20:12.000+00:00",
+    "specifications": [
+      {
+        "docDate": "2026-03-17",
+        "amount": 126714.8971875,
+        "currCode": "840",
+        "docType": 0,
+        "docNo": "1",
+        "imExFlag": 1,
+        "serialNo": 1,
+        "oldNo": "1",
+        "status": 0,
+        "confirmations": [],
+        "goods": [
+          {
+            "tnCode": "8431310000",
+            "itemsName": "bolts / Болт",
+            "serialNo": 1,
+            "unitCode": "796",
+            "quantity": 544994,
+            "currCode": "840",
+            "cost": 0.01609375,
+            "amount": 8770.9971875,
+            "status": 0
+          },
+          {
+            "tnCode": "8431310000",
+            "itemsName": "guide rail etc. /   Направляющая рейка и\nт.д.",
+            "serialNo": 2,
+            "unitCode": "796",
+            "quantity": 20,
+            "currCode": "840",
+            "cost": 2014.43,
+            "amount": 40288.6,
+            "status": 0
+          },
+          {
+            "tnCode": "8431310000",
+            "itemsName": "control parts  /  Элементы управления",
+            "serialNo": 3,
+            "unitCode": "796",
+            "quantity": 20,
+            "currCode": "840",
+            "cost": 3307.85,
+            "amount": 66157,
+            "status": 0
+          },
+          {
+            "tnCode": "6832632636",
+            "itemsName": "safety parts /  Элементы безопасности",
+            "serialNo": 4,
+            "unitCode": "796",
+            "quantity": 20,
+            "currCode": "840",
+            "cost": 574.915,
+            "amount": 11498.3,
+            "status": 0
+          }
+        ],
+        "fare": null,
+        "services": []
+      }
+    ],
+    "consignors": [
+      {
+        "serialNo": 1,
+        "name": "CHINA Jiagang VIVA IMP. AND EXP. CO.,LTD.",
+        "countryCode": "156",
+        "inn": null,
+        "status": 0
+      }
+    ],
+    "consignees": [
+      {
+        "serialNo": 1,
+        "name": "JAMSHIDBEK PLAST SERVIS MCHJ",
+        "countryCode": "860",
+        "inn": "308136891",
+        "status": 0
+      }
+    ],
+    "manufacturers": [
+      {
+        "serialNo": 1,
+        "name": "Zhang Jiagang VIVA IMP. AND EXP. CO.,LTD.",
+        "countryCode": "156",
+        "inn": null,
+        "status": 0
+      }
+    ],
+    "deliveryTerms": [
+      {
+        "destination": "Ташкент",
+        "incotermsCode": "07",
+        "serialNo": 1,
+        "status": 0
+      }
+    ],
+    "importTerms": [
+      {
+        "paymentMethod": "02",
+        "paymentTerm": null,
+        "importTerm": 90,
+        "status": 0
+      }
+    ],
+    "declarations": [],
+    "payments": [
+      {
+        "docDate": "2026-03-19",
+        "fundSourceType": 2,
+        "currCode": "840",
+        "amount": 322323,
+        "serialNo": 1,
+        "docNo": "32323232",
+        "status": 0,
+        "goodsAmount1": 30500
+      }
+    ]
+  }
+}

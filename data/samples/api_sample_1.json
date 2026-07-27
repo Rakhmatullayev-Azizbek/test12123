@@ -1,0 +1,165 @@
+{
+  "status": 0,
+  "errorMsg": "OK",
+  "timeStamp": "2026-07-22T13:36:22.655+00:00",
+  "gtkId": 3232322323,
+  "contract": {
+    "idn": "3232323232323232",
+    "rootIdn": null,
+    "cntrType": "02",
+    "oldIdn": null,
+    "bankId": "32323",
+    "bankInn": "423232",
+    "okpo": "        ",
+    "okonx": "13.10.1",
+    "contractorUzParentCompany": null,
+    "contractorUzName": "ООО KIBRAY ИПАГИ",
+    "rgnCode": "06",
+    "industrialZoneCode": 0,
+    "contractorUzAddress": "БУХАРСКАЯ ОБЛ., ВОБКЕНТСКИЙ Р-Н, УЛ.БАБУР, 3.",
+    "contractorUzPhone": "",
+    "cntrSubject": 1,
+    "currCode1": "840",
+    "currCode2": null,
+    "amount1": 52000,
+    "amount2": null,
+    "accCurrCode1": "840",
+    "accCurrCode2": null,
+    "contractorForName": "SHANDONG GUANGTONG SILKWORM EGGS CO., LTD.",
+    "contractorForCountryCode": "156",
+    "contractorForAddress": "China, Shandong, Qingzhou City, No.3232 West Fangongting Road.",
+    "bankForName": "AGRICULTURAL BANK OF CHINA WEIFANG BRANCH",
+    "bankForCountryCode": "156",
+    "bankForAddress": "China, HONKGONG City, No. 2085 West Fangongting Road.",
+    "bankForAttributes": "SWIFT CODE: 32323cmkk No: 121212132121",
+    "productsName": "Грена тутувого гибридного шелкопрядка",
+    "docNo": "3dedwew",
+    "docDate": "2025-01-31",
+    "cntrStatus": 0,
+    "status": 0,
+    "contractorUzInn": "534343434",
+    "insTime": "2025-03-13T05:37:30.748+00:00",
+    "specifications": [
+      {
+        "docDate": "2025-01-31",
+        "amount": 52000,
+        "agrmNo": null,
+        "currCode": "840",
+        "docType": 0,
+        "docNo": "1",
+        "imExFlag": 1,
+        "serialNo": 1,
+        "oldNo": "1",
+        "status": 0,
+        "confirmations": [],
+        "goods": [
+          {
+            "tnCode": "0511998510",
+            "itemsName": "Грена тутувого гибридного шелкопрядка",
+            "serialNo": 1,
+            "unitCode": "796",
+            "quantity": 8000,
+            "currCode": "840",
+            "cost": 6.5,
+            "amount": 52000,
+            "status": 0
+          }
+        ],
+        "fare": null,
+        "services": []
+      }
+    ],
+    "consignors": [
+      {
+        "serialNo": 1,
+        "name": "HONKONG SILKROAD SILKWORM EGGS CO., LTD.",
+        "countryCode": "156",
+        "inn": null,
+        "status": 0
+      }
+    ],
+    "consignees": [
+      {
+        "serialNo": 1,
+        "name": "ООО KIBRAY ИПАГИ",
+        "countryCode": "860",
+        "inn": "23232323",
+        "status": 0
+      }
+    ],
+    "manufacturers": [
+      {
+        "serialNo": 1,
+        "name": "HONGKONG SILKROAD SILKWORM EGGS CO., LTD.",
+        "countryCode": "156",
+        "inn": null,
+        "status": 0
+      }
+    ],
+    "deliveryTerms": [
+      {
+        "destination": "Ташкент",
+        "incotermsCode": "08",
+        "agrmNo": null,
+        "serialNo": 1,
+        "status": 0
+      }
+    ],
+    "importTerms": [
+      {
+        "paymentMethod": "02",
+        "paymentTerm": null,
+        "paymentDeadline": null,
+        "importTerm": 90,
+        "importDeadline": null,
+        "agrmNo": null,
+        "status": 0
+      }
+    ],
+    "declarations": [
+      {
+        "g7a": "12003",
+        "g7c": "323232",
+        "g7b": "2025-04-05",
+        "g1": "ИМ40",
+        "g2name": "HONGKONG SILKROAD SILKWORM EGGS CO., LTD",
+        "g8name": "ООО kibray Ipagi",
+        "g23": 12920.44,
+        "g22a": "840",
+        "g15": "156"
+      }
+    ],
+    "payments": [
+      {
+        "docDate": "2025-03-14",
+        "fundSourceType": 1,
+        "currCode": "840",
+        "amount": 20000,
+        "serialNo": 1,
+        "docNo": "212233233",
+        "status": 0,
+        "goodsAmount1": 20000
+      },
+      {
+        "docDate": "2026-03-16",
+        "fundSourceType": 1,
+        "currCode": "840",
+        "amount": 22400,
+        "serialNo": 2,
+        "docNo": "23232323",
+        "status": 0,
+        "goodsAmount1": 22400
+      },
+      {
+        "docDate": "2026-04-21",
+        "fundSourceType": 1,
+        "currCode": "840",
+        "amount": 9600,
+        "serialNo": 5,
+        "docNo": "423232323",
+        "status": 0,
+        "goodsAmount1": 9600
+      }
+    ]
+  }
+}

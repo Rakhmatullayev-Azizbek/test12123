@@ -1,0 +1,314 @@
+{
+  "extracted": {
+    "meta": {
+      "contract_number": "UZ-2024/15",
+      "contract_date": "2024-03-25",
+      "seller": {
+        "name": "ООО \"TEXTILE EXPORT\"",
+        "country": "Узбекистан",
+        "address": "г. Ташкент, ул. Навои 12",
+        "inn": "305123456",
+        "phone": "+998 71 200-00-00",
+        "director": null,
+        "bank": {
+          "name": "АКБ \"Kapitalbank\"",
+          "address": null,
+          "account": "20208000900123456789",
+          "mfo": "01088",
+          "swift": "KACHUZ22"
+        }
+      },
+      "buyer": {
+        "name": "BUYER GMBH",
+        "country": "Германия",
+        "address": "Берлин, Hauptstrasse 5",
+        "inn": null,
+        "phone": null,
+        "director": null,
+        "bank": {
+          "name": "Deutsche Bank AG",
+          "address": null,
+          "account": null,
+          "mfo": null,
+          "swift": "DEUTDEFF"
+        }
+      },
+      "delivery": {
+        "incoterms": "DPU",
+        "place": "Ташкент",
+        "deadline": "2024-12-31"
+      },
+      "currency": "USD",
+      "total_amount": 125000.5,
+      "payment_terms": "100% предоплата в течение 10 банковских дней"
+    },
+    "products": {
+      "products": [
+        {
+          "name": "Ткань хлопчатобумажная",
+          "hs_code": null,
+          "unit": "шт",
+          "quantity": 1000.0,
+          "price": 50.0,
+          "amount": 50000.0
+        },
+        {
+          "name": "Пряжа хлопковая",
+          "hs_code": null,
+          "unit": "шт",
+          "quantity": 500.0,
+          "price": 100.0,
+          "amount": 50000.0
+        },
+        {
+          "name": "Трикотажное полотно",
+          "hs_code": null,
+          "unit": "шт",
+          "quantity": 300.0,
+          "price": 80.0,
+          "amount": 24000.0
+        },
+        {
+          "name": "Нитки швейные",
+          "hs_code": null,
+          "unit": "шт",
+          "quantity": 100.0,
+          "price": 10.005,
+          "amount": 1000.5
+        }
+      ],
+      "total_amount": 125000.5
+    }
+  },
+  "validation": {
+    "fields": {
+      "contract_number": {
+        "value": "UZ-2024/15",
+        "confidence": "high",
+        "issues": []
+      },
+      "contract_date": {
+        "value": "2024-03-25",
+        "confidence": "high",
+        "issues": []
+      },
+      "currency": {
+        "value": "USD",
+        "confidence": "high",
+        "issues": []
+      },
+      "total_amount": {
+        "value": 125000.5,
+        "confidence": "high",
+        "issues": []
+      },
+      "payment_terms": {
+        "value": "100% предоплата в течение 10 банковских дней",
+        "confidence": "high",
+        "issues": []
+      },
+      "seller.name": {
+        "value": "ООО \"TEXTILE EXPORT\"",
+        "confidence": "high",
+        "issues": []
+      },
+      "seller.country": {
+        "value": "Узбекистан",
+        "confidence": "high",
+        "issues": []
+      },
+      "seller.address": {
+        "value": "г. Ташкент, ул. Навои 12",
+        "confidence": "high",
+        "issues": []
+      },
+      "seller.inn": {
+        "value": "305123456",
+        "confidence": "high",
+        "issues": []
+      },
+      "seller.director": {
+        "value": null,
+        "confidence": "failed",
+        "issues": [
+          "topilmadi"
+        ]
+      },
+      "seller.bank.name": {
+        "value": "АКБ \"Kapitalbank\"",
+        "confidence": "high",
+        "issues": []
+      },
+      "seller.bank.account": {
+        "value": "20208000900123456789",
+        "confidence": "high",
+        "issues": []
+      },
+      "seller.bank.mfo": {
+        "value": "01088",
+        "confidence": "high",
+        "issues": []
+      },
+      "seller.bank.swift": {
+        "value": "KACHUZ22",
+        "confidence": "high",
+        "issues": []
+      },
+      "buyer.name": {
+        "value": "BUYER GMBH",
+        "confidence": "high",
+        "issues": []
+      },
+      "buyer.country": {
+        "value": "Германия",
+        "confidence": "high",
+        "issues": []
+      },
+      "buyer.address": {
+        "value": "Берлин, Hauptstrasse 5",
+        "confidence": "high",
+        "issues": []
+      },
+      "buyer.inn": {
+        "value": null,
+        "confidence": "failed",
+        "issues": [
+          "topilmadi"
+        ]
+      },
+      "buyer.director": {
+        "value": null,
+        "confidence": "failed",
+        "issues": [
+          "topilmadi"
+        ]
+      },
+      "buyer.bank.name": {
+        "value": "Deutsche Bank AG",
+        "confidence": "high",
+        "issues": []
+      },
+      "buyer.bank.account": {
+        "value": null,
+        "confidence": "failed",
+        "issues": [
+          "topilmadi"
+        ]
+      },
+      "buyer.bank.mfo": {
+        "value": null,
+        "confidence": "failed",
+        "issues": [
+          "topilmadi"
+        ]
+      },
+      "buyer.bank.swift": {
+        "value": "DEUTDEFF",
+        "confidence": "high",
+        "issues": []
+      },
+      "delivery.incoterms": {
+        "value": "DPU",
+        "confidence": "high",
+        "issues": []
+      },
+      "delivery.place": {
+        "value": "Ташкент",
+        "confidence": "high",
+        "issues": []
+      },
+      "products[0].name": {
+        "value": "Ткань хлопчатобумажная",
+        "confidence": "high",
+        "issues": []
+      },
+      "products[0].quantity": {
+        "value": 1000.0,
+        "confidence": "high",
+        "issues": []
+      },
+      "products[0].price": {
+        "value": 50.0,
+        "confidence": "high",
+        "issues": []
+      },
+      "products[0].amount": {
+        "value": 50000.0,
+        "confidence": "high",
+        "issues": []
+      },
+      "products[1].name": {
+        "value": "Пряжа хлопковая",
+        "confidence": "high",
+        "issues": []
+      },
+      "products[1].quantity": {
+        "value": 500.0,
+        "confidence": "high",
+        "issues": []
+      },
+      "products[1].price": {
+        "value": 100.0,
+        "confidence": "high",
+        "issues": []
+      },
+      "products[1].amount": {
+        "value": 50000.0,
+        "confidence": "high",
+        "issues": []
+      },
+      "products[2].name": {
+        "value": "Трикотажное полотно",
+        "confidence": "high",
+        "issues": []
+      },
+      "products[2].quantity": {
+        "value": 300.0,
+        "confidence": "high",
+        "issues": []
+      },
+      "products[2].price": {
+        "value": 80.0,
+        "confidence": "high",
+        "issues": []
+      },
+      "products[2].amount": {
+        "value": 24000.0,
+        "confidence": "high",
+        "issues": []
+      },
+      "products[3].name": {
+        "value": "Нитки швейные",
+        "confidence": "high",
+        "issues": []
+      },
+      "products[3].quantity": {
+        "value": 100.0,
+        "confidence": "high",
+        "issues": []
+      },
+      "products[3].price": {
+        "value": 10.005,
+        "confidence": "high",
+        "issues": []
+      },
+      "products[3].amount": {
+        "value": 1000.5,
+        "confidence": "high",
+        "issues": []
+      }
+    },
+    "arithmetic": {
+      "rows_ok": true,
+      "row_issues": [],
+      "line_sum": 125000.5,
+      "total_ok": true
+    },
+    "summary": {
+      "high": 36,
+      "low": 0,
+      "failed": 5,
+      "overall": "low"
+    }
+  }
+}

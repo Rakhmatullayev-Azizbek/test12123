@@ -1,0 +1,94 @@
+services:
+  # LLM server — Qwen3-14B AWQ (OpenAI-mos API, :8000) — extraction bosqichi [5]
+  vllm:
+    image: vllm/vllm-openai:latest
+    command: >
+      --model Qwen/Qwen3-14B-AWQ
+      --max-model-len 20480
+      --gpu-memory-utilization 0.60
+    ports:
+      - "8000:8000"
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+    gpus: all
+    ipc: host
+    environment:
+      # WSL2'da vLLM pin-memory'ni o'chirib qo'yadi, yangi UVA buferlar esa
+      # ishlamay qoladi ("UVA is not available") — bu bayroq majburan yoqadi
+      - VLLM_WSL2_ENABLE_PIN_MEMORY=1
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      start_period: 600s
+
+  # Surya 0.22 foundation modeli ham vLLM orqali xizmat qiladi — OCR bosqichi [2]
+  # (parametrlar surya'ning o'zi spawn qiladigan konteyner bilan bir xil)
+  surya:
+    image: vllm/vllm-openai:latest
+    command:
+      - "datalab-to/surya-ocr-2"
+      - "--no-enforce-eager"
+      - "--dtype"
+      - "bfloat16"
+      - "--max-model-len"
+      - "18000"
+      - "--max-num-seqs"
+      - "32"
+      - "--max-num-batched-tokens"
+      - "8192"
+      - "--gpu-memory-utilization"
+      - "0.25"
+      - "--enable-prefix-caching"
+      - "--mm-processor-kwargs"
+      - '{"min_pixels": 3136, "max_pixels": 6291456}'
+      - "--served-model-name"
+      - "datalab-to/surya-ocr-2"
+    ports:
+      - "8001:8000"
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+    gpus: all
+    ipc: host
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      start_period: 600s
+
+  # Web interfeys — http://localhost:8080 (PDF + JSON yuklab tekshirish)
+  web:
+    build: .
+    entrypoint: ["uvicorn", "eisvo_ocr.server:app", "--host", "0.0.0.0", "--port", "8080"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - hf-cache:/models
+      - ./data:/data
+    gpus: all
+    environment:
+      - EISVO_VLLM_BASE_URL=http://vllm:8000/v1
+      - SURYA_INFERENCE_URL=http://surya:8000/v1
+    depends_on:
+      surya:
+        condition: service_healthy
+      vllm:
+        condition: service_started
+
+  # CLI varianti (surya klienti + assembler + LLM klienti + validator + compare)
+  app:
+    build: .
+    volumes:
+      - hf-cache:/models
+      - ./data:/data          # PDF va natijalar: docker compose run app /data/contract.pdf
+    gpus: all
+    environment:
+      - EISVO_VLLM_BASE_URL=http://vllm:8000/v1
+      - SURYA_INFERENCE_URL=http://surya:8000/v1
+    depends_on:
+      surya:
+        condition: service_healthy
+      vllm:
+        condition: service_started
+    profiles: ["run"]         # faqat qo'lda ishga tushiriladi
+
+volumes:
+  hf-cache:
