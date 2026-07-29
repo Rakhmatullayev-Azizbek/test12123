@@ -129,7 +129,7 @@ def _strip_diacritics(s: str) -> str:
 
 def _fold_word(w: str) -> str:
     """Bitta so'zni normalizatsiya kaliti shakliga (translit + diakritik + x->h)."""
-    w = _strip_diacritics(_translit(str(w).lower())).replace("x", "h")
+    w = _strip_diacritics(_translit(str(w).lower())).replace("ı", "i").replace("x", "h")
     return re.sub(r"[^0-9a-z]", "", w)
 
 
@@ -149,6 +149,15 @@ for _grp in [
     ["Termiz", "Termez", "Термез"],
     ["Guliston", "Gulistan", "Гулистан"],
     ["Xiva", "Khiva", "Хива"],
+    # viloyat markazlari / nomlari — translit farqi katta bo'lgani uchun (Джизак↔Jizzax:
+    # dj/j, k/x) skelet yutolmaydi, gazetteer kanoni kerak
+    ["Jizzax", "Djizzax", "Djizak", "Jizzakh", "Джизак", "Джизах"],
+    ["Fargona", "Farona", "Fergana", "Фергана"],
+    ["Sirdaryo", "Sirdarya", "Сырдарья"],
+    ["Qashqadaryo", "Kashkadarya", "Кашкадарья"],
+    ["Surxondaryo", "Surxandarya", "Сурхандарья"],
+    ["Xorazm", "Khorezm", "Хорезм"],
+    ["Nukus", "Нукус"],
 ]:
     _canon = _fold_word(_grp[0])
     for _name in _grp:
@@ -157,6 +166,8 @@ for _grp in [
 
 def _norm_text(s: Any) -> str:
     s = _strip_diacritics(_translit(str(s).lower()))
+    # turk «ı» (nuqtasiz i) -> «i» (Bankası -> bankasi; NFKD uni ajratmaydi)
+    s = s.replace("ı", "i")
     # o'zbekcha x <-> h / rus х varianti (Buxoro<->Buhara, Suxrob<->Suhrob) — ikkala
     # tomon bir xil fold qilinadi, shuning uchun mavjud mosliklarni buzmaydi
     s = s.replace("x", "h")
@@ -193,13 +204,22 @@ def _cmp_date(ours: Any, theirs: Any) -> tuple[str, float]:
 
 
 def _cmp_id(ours: Any, theirs: Any) -> tuple[str, float]:
-    def norm(v: Any) -> str:
-        v = str(v).translate(_HOMOGLYPH)  # kirill homoglifni lotinga (НАН->HAH)
+    def _strip(v: str) -> str:
         # № va # belgilarini HAR JOYDAN olib tashlaymiz («KEM-OZO №03/02» ichida ham),
         # bo'shliq/defisni ham — «KEM-OZO № 03/02» == «KEMOZO03/02»
         return re.sub(r"[\s\-–—№#]", "", v).upper()
-    a, b = norm(ours), norm(theirs)
-    return ("match" if a == b else "mismatch"), (1.0 if a == b else 0.0)
+
+    def norm_visual(v: Any) -> str:
+        return _strip(str(v).translate(_HOMOGLYPH))  # kirill VIZUAL homoglif (НАН->HAH)
+
+    def norm_phon(v: Any) -> str:
+        return _strip(_translit(str(v).lower()))  # FONETIK translit (Б-038882 -> B038882)
+
+    # Ikki normalizatsiya: vizual (Н->H) ID'da НАН==HAH uchun; fonetik (б->b, в->v)
+    # esa «Б-038882»==«B-038882» uchun. Fonetik б/в ni AJRATADI (b vs v), shuning uchun
+    # ikkisini OR qilish soxta moslik bermaydi («Б-100» != «В-100»).
+    ok = (norm_visual(ours) == norm_visual(theirs)) or (norm_phon(ours) == norm_phon(theirs))
+    return ("match" if ok else "mismatch"), (1.0 if ok else 0.0)
 
 
 def _cmp_text(ours: Any, theirs: Any) -> tuple[str, float]:
@@ -250,16 +270,31 @@ def _addr_tokens(s: Any) -> list[str]:
 
 
 def _toponym_root(tok: str) -> str:
-    """Toponim o'zagi: rus sifat qo'shimchasini kesib, q->k folding va gazetteer
-    kanonini qo'llaydi. «каршинский»->karsh, «сырдарьинская»->sirdar, «qarshi»->qarshi
-    (q->k->karshi->gazetteer->qarshi). Shu bilan sifat/ot va q/k tafovutlari yutiladi."""
+    """Toponim o'zagi: rus sifat qo'shimchasini kesib, gazetteer kanoni va q->k
+    folding qo'llaydi. «каршинский»->karsh, «сырдарьинская»->sirdar. q->k OXIRIDA —
+    shunda API «qarshi»->gazetteer->qarshi->karshi va PDF «karsh» ikkalasi ham 'k'."""
     t = tok
     for suf in _ADJ_SUFFIXES:
         if t.endswith(suf) and len(t) - len(suf) >= 4:
             t = t[: -len(suf)]
             break
-    t = t.replace("q", "k")  # Qarshi==Karshi, Qashqadaryo==Kashkadaryo
-    return _PLACE_CANON.get(t, t)
+    t = _PLACE_CANON.get(t, t)   # gazetteer kanoni AVVAL
+    return t.replace("q", "k")   # q->k OXIRIDA (Qarshi==Karshi, Qashqadaryo==Kashkadaryo)
+
+
+_VOWELS = frozenset("aeiou")
+
+
+def _root_match(a: str, b: str) -> bool:
+    """Ikki toponim o'zagi mosmi: fuzzy partial_ratio YOKI undosh-skelet tengligi.
+    Skelet unli farqlarini yutadi: «yashnobod»(uz)↔«yashnabad»(ru) -> «yshnbd»==«yshnbd»."""
+    if not a or not b:
+        return False
+    if fuzz.partial_ratio(a, b) >= 82:
+        return True
+    sa = "".join(c for c in a if c not in _VOWELS)
+    sb = "".join(c for c in b if c not in _VOWELS)
+    return len(sa) >= 4 and sa == sb
 
 
 def _cmp_address(ours: Any, theirs: Any) -> tuple[str, float]:
@@ -273,13 +308,10 @@ def _cmp_address(ours: Any, theirs: Any) -> tuple[str, float]:
     roots_a = [_toponym_root(t) for t in toks_a]
     roots_b = [_toponym_root(t) for t in toks_b]
     # kamroq atoqli otga ega tomonni ikkinchisida qidiramiz (subset mantiqi):
-    # har bir o'zak ikkinchi tomon o'zaklaridan birortasiga fuzzy mos kelsa — topildi
+    # har bir o'zak ikkinchi tomon o'zaklaridan birortasiga mos kelsa — topildi
     (short, long_roots) = (roots_b, roots_a) if len(roots_b) <= len(roots_a) \
         else (roots_a, roots_b)
-    found = sum(
-        1 for s in short
-        if s and any(l and fuzz.partial_ratio(s, l) >= 82 for l in long_roots)
-    )
+    found = sum(1 for s in short if any(_root_match(s, l) for l in long_roots))
     score = found / len(short)
     return ("match" if score >= 0.6 else "mismatch"), round(score, 3)
 

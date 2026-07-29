@@ -82,7 +82,11 @@ COUNTRY_NUM2NAMES: dict[str, list[str]] = {
 # --- O'lchov birligi klassifikatori (OKEI) ---
 UNIT_CODE2NAMES: dict[str, list[str]] = {
     "796": ["шт", "шт.", "штука", "штук", "дона", "dona", "pcs", "piece", "pc",
-            "unit", "units", "ед", "ед.", "единица", "единиц", "birlik", "birlik dona"],
+            "unit", "units", "ед", "ед.", "единица", "единиц", "birlik", "birlik dona",
+            # EISVO sanaladigan (diskret) birliklarni ko'pincha 796 bilan kodlaydi:
+            # комплект/набор/кассета — bittalab sanaladi, штука bilan mos deб qabul qilamiz
+            "комплект", "комплекты", "komplekt", "набор", "наборы", "nabor",
+            "кассета", "кассеты", "kasseta"],
     "166": ["кг", "кг.", "kg", "килограмм", "kilogramm"],
     "168": ["т", "тонна", "tonna", "ton", "mt"],
     "006": ["м", "метр", "metr", "m"],
@@ -134,10 +138,20 @@ CURRENCY_ALIASES: dict[str, list[str]] = {
 }
 
 
+def _same_numeric_code(pdf_value: str, api_code: str) -> bool:
+    """Model ba'zan qiymatni harfli emas, API'dagi kabi RAQAMLI kod bilan chiqaradi
+    («643», «156», «08»). Bunda to'g'ridan-to'g'ri kod tengligini tekshiramiz
+    (boshidagi nollarni e'tiborsiz: «08»==«8»)."""
+    pv, api = str(pdf_value).strip(), str(api_code).strip()
+    return pv.isdigit() and api.isdigit() and int(pv) == int(api)
+
+
 def currency_matches(pdf_value: str, api_code: str) -> bool | None:
     """None = kodni bilmaymiz (taqqoslab bo'lmaydi). Valyuta PDF'da har xil
-    ko'rinishda yozilishi mumkin («доллары США», «долл.», «USD», «$») —
-    barchasini harfli kodga bog'laymiz."""
+    ko'rinishda yozilishi mumkin («доллары США», «долл.», «USD», «$», yoki
+    to'g'ridan-to'g'ri «643» raqamli kod) — barchasini harfli kodga bog'laymiz."""
+    if _same_numeric_code(pdf_value, api_code):
+        return True
     alpha = CURRENCY_NUM2ALPHA.get(str(api_code).strip())
     if alpha is None:
         return None
@@ -154,6 +168,8 @@ def currency_matches(pdf_value: str, api_code: str) -> bool | None:
 
 
 def country_matches(pdf_value: str, api_code: str) -> bool | None:
+    if _same_numeric_code(pdf_value, api_code):
+        return True
     names = COUNTRY_NUM2NAMES.get(str(api_code).strip().zfill(3))
     if names is None:
         return None
@@ -170,6 +186,8 @@ def _unit_key(s: str) -> str:
 
 
 def unit_matches(pdf_value: str, api_code: str) -> bool | None:
+    if _same_numeric_code(pdf_value, api_code):
+        return True
     names = UNIT_CODE2NAMES.get(str(api_code).strip().zfill(3))
     if names is None:
         return None
@@ -184,6 +202,8 @@ def unit_matches(pdf_value: str, api_code: str) -> bool | None:
 
 
 def incoterms_matches(pdf_value: str, api_code: str) -> bool | None:
+    if _same_numeric_code(pdf_value, api_code):
+        return True
     term = INCOTERMS_CODE2TERM.get(str(api_code).strip().zfill(2))
     if term is None:
         return None
