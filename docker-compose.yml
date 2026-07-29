@@ -63,6 +63,7 @@ services:
     volumes:
       - hf-cache:/models
       - ./data:/data
+      - ./eisvo_ocr:/app/eisvo_ocr   # manba kodi live — frontend/compare tahriri rebuild'siz tushadi
     gpus: all
     environment:
       - EISVO_VLLM_BASE_URL=http://vllm:8000/v1

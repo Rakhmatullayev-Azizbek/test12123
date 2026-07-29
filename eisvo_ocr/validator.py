@@ -17,7 +17,7 @@ from .config import settings
 from .deterministic import RE_ACCOUNT, RE_INN, RE_MFO, RE_SWIFT
 from .schemas import ExtractedContract
 
-HIGH, LOW, FAILED = "high", "low", "failed"
+HIGH, LOW, FAILED, NA = "high", "low", "failed", "na"
 
 _FORMAT_CHECKS = {
     "inn": lambda v: bool(RE_INN.fullmatch(v)),
@@ -62,17 +62,20 @@ def validate(extracted: ExtractedContract, ocr_plain_text: str) -> dict:
 
     def add(path: str, value: Any, fmt_key: str | None = None, skip_ocr: bool = False,
             required: bool = True):
-        """required=False bo'lsa va qiymat topilmasa — umuman e'tibor bermaymiz.
-        Ko'p maydon shartnomada bo'lmasligi normal: chet el sotuvchisida O'zbek INN,
-        MFO yo'q; bank/manzil/telefon ixtiyoriy — ularni «FAILED» qilib shovqin
-        chiqarmaymiz, faqat MAVJUD qiymatlarni tekshiramiz."""
+        """Topilmagan (None) maydon — neytral «topilmadi» (NA), qizil xato EMAS.
+        `required` faqat umumiy ishonch baliga ta'sir qiladi: majburiy maydon
+        topilmasa (shartnoma raqami/summa/tomon nomi) verdict pasayadi, ixtiyoriy
+        maydon (chet el INN, MFO, bank...) topilmasa neytral qoladi. Har ikkisi ham
+        «Topilmadi» ro'yxatida ko'rinadi."""
         issues: list[str] = []
         conf = HIGH
         if value is None:
-            if required:
-                fields[path] = {"value": None, "confidence": FAILED, "issues": ["topilmadi"]}
+            fields[path] = {"value": None, "confidence": NA,
+                            "issues": ["topilmadi"], "required": required}
             return
-        if fmt_key and not _FORMAT_CHECKS[fmt_key](str(value).strip()):
+        # format tekshiruvi raqamlar orasidagi bo'shliqlarni e'tiborga olmaydi
+        # (INN «211 212 877», hisob «8787 8787 ...» — bular to'g'ri, faqat guruhlangan)
+        if fmt_key and not _FORMAT_CHECKS[fmt_key](re.sub(r"\s+", "", str(value))):
             issues.append(f"format xato ({fmt_key})")
             conf = FAILED
         if not skip_ocr and not _in_ocr(value, ocr_norm, ocr_digits):
@@ -92,7 +95,8 @@ def validate(extracted: ExtractedContract, ocr_plain_text: str) -> dict:
     for role in ("seller", "buyer"):
         party = getattr(m, role)
         if party is None:
-            fields[role] = {"value": None, "confidence": FAILED, "issues": ["topilmadi"]}
+            fields[role] = {"value": None, "confidence": NA,
+                            "issues": ["topilmadi"], "required": True}
             continue
         add(f"{role}.name", party.name)
         add(f"{role}.country", party.country, required=False)
@@ -104,6 +108,11 @@ def validate(extracted: ExtractedContract, ocr_plain_text: str) -> dict:
             add(f"{role}.bank.account", party.bank.account, fmt_key="account", required=False)
             add(f"{role}.bank.mfo", party.bank.mfo, fmt_key="mfo", required=False)
             add(f"{role}.bank.swift", party.bank.swift, fmt_key="swift", required=False)
+    if getattr(m, "receiver", None):
+        add("receiver.name", m.receiver.name, required=False)
+        add("receiver.country", m.receiver.country, required=False)
+        add("receiver.address", m.receiver.address, required=False)
+        add("receiver.inn", m.receiver.inn, required=False)  # chet el qabul qiluvchi 9-raqamli emas
     if m.delivery:
         add("delivery.incoterms", m.delivery.incoterms, skip_ocr=True, required=False)
         add("delivery.place", m.delivery.place, required=False)
@@ -143,12 +152,17 @@ def validate(extracted: ExtractedContract, ocr_plain_text: str) -> dict:
                         f"sum(amount)={line_sum:.2f} total bilan mos emas"
                     )
 
-    counts = {c: 0 for c in (HIGH, LOW, FAILED)}
+    counts = {HIGH: 0, LOW: 0, FAILED: 0, NA: 0}
+    crit_missing = 0  # topilmagan MAJBURIY maydonlar (verdict'ga ta'sir qiladi)
     for f in fields.values():
-        counts[f["confidence"]] += 1
-    n = max(len(fields), 1)
-    overall = HIGH if counts[FAILED] == 0 and counts[LOW] / n <= 0.1 else (
-        LOW if counts[FAILED] / n <= 0.2 else FAILED
+        counts[f["confidence"]] = counts.get(f["confidence"], 0) + 1
+        if f["confidence"] == NA and f.get("required"):
+            crit_missing += 1
+    # neytral (ixtiyoriy topilmadi) maydonlar ratioga kirmaydi
+    n = max(counts[HIGH] + counts[LOW] + counts[FAILED] + crit_missing, 1)
+    failed_like = counts[FAILED] + crit_missing
+    overall = HIGH if failed_like == 0 and counts[LOW] / n <= 0.1 else (
+        LOW if failed_like / n <= 0.2 else FAILED
     )
 
     return {
@@ -159,5 +173,5 @@ def validate(extracted: ExtractedContract, ocr_plain_text: str) -> dict:
             "line_sum": round(line_sum, 2),
             "total_ok": total_ok,
         },
-        "summary": {**counts, "overall": overall},
+        "summary": {**counts, "overall": overall, "critical_missing": crit_missing},
     }

@@ -10,6 +10,7 @@ aniqlanadi (ikkala variant sinab, mosligi ko'prog'i olinadi).
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any, Callable
 
 from rapidfuzz import fuzz
@@ -33,19 +34,44 @@ _FIELD_SPECS: list[tuple[str, str, str]] = [
     ("total_amount", "amount1", "number"),
     ("{FOR}.name", "contractorForName", "text"),
     ("{FOR}.country", "contractorForCountryCode", "country"),
-    ("{FOR}.address", "contractorForAddress", "text"),
+    ("{FOR}.address", "contractorForAddress", "address"),
     ("{FOR}.bank.name", "bankForName", "text"),
     # SWIFT + hisob API'da yagona erkin matn (bankForAttributes) — birlashtirib
     # tekshiriladi (pastdagi _bank_attributes_row), shuning uchun bu yerda alohida emas
     ("{UZ}.name", "contractorUzName", "text"),
     ("{UZ}.inn", "contractorUzInn", "id"),
-    ("{UZ}.address", "contractorUzAddress", "text"),
+    ("{UZ}.address", "contractorUzAddress", "address"),
     ("delivery.place", "deliveryTerms.0.destination", "text"),
     ("delivery.incoterms", "deliveryTerms.0.incotermsCode", "incoterms"),
 ]
 
 # yo'nalishni aniqlashda ishlatiladigan maydonlar
 _ORIENTATION_FIELDS = {"{FOR}.name", "{UZ}.name", "{UZ}.inn", "{FOR}.country"}
+
+# Грузополучатель / Consignee — yo'nalishga bog'liq EMAS (API'da to'g'ridan-to'g'ri
+# consignees[] massivida). Tovar turidagi shartnomalarda bor, quyidagi turlardan tashqari.
+_RECEIVER_SPECS: list[tuple[str, str, str]] = [
+    ("receiver.name", "consignees.0.name", "text"),
+    ("receiver.country", "consignees.0.countryCode", "country"),
+    ("receiver.inn", "consignees.0.inn", "id"),
+]
+_NO_RECEIVER_TYPES = {"10", "13", "22", "98", "99"}  # bu turlarda Грузополучатель yo'q
+
+# yo'nalishdan MUSTAQIL qo'shimcha maydonlar (API'da to'g'ridan-to'g'ri yo'llarda):
+# Грузоотправитель consignors[], Производитель manufacturers[], spetsifikatsiya, to'lov valyutasi/muddati
+_EXTRA_SPECS: list[tuple[str, str, str]] = [
+    ("supplier.name", "consignors.0.name", "text"),
+    ("supplier.country", "consignors.0.countryCode", "country"),
+    ("supplier.inn", "consignors.0.inn", "id"),
+    ("manufacturer.name", "manufacturers.0.name", "text"),
+    ("manufacturer.country", "manufacturers.0.countryCode", "country"),
+    ("manufacturer.inn", "manufacturers.0.inn", "id"),
+    ("specification_number", "specifications.0.docNo", "id"),
+    ("payment_deadline", "importTerms.0.paymentDeadline", "id"),
+    # payment_currency ATAYLAB yo'q: API accCurrCode1 doim bor va odatda shartnoma
+    # valyutasi bilan bir xil — solishtirilsa soxta mismatch beradi (currency allaqachon
+    # currCode1 bilan tekshiriladi). Maydon ajratiladi-yu, taqqoslanmaydi.
+]
 
 
 def _get_path(obj: Any, path: str) -> Any:
@@ -73,14 +99,75 @@ _LEGAL_FORMS = {
     "mchj", "yatt", "qmj", "jsc",
     "llc", "ltd", "co", "inc", "corp", "gmbh", "ag", "sa", "srl", "spa",
     "bv", "plc", "pte", "pvt",
+    # o'zbek/rus to'liq shakllar (translit + x->h fold'dan keyingi ko'rinishda):
+    # «Хозяйственное Общество», «Hususiy Korxonasi/Korxona», «...jamiyati»
+    "hozyaystvennoe", "obschestvo", "hususiy", "korhona", "korhonasi",
+    "jamiyat", "jamiyati", "korxona", "korxonasi",
+    # «Mas'uliyati Cheklangan Jamiyati» (MChJ = LLC) to'liq shakli — apostrof
+    # olib tashlangach «masuliyati» bir so'z; rus «...ограниченной ответственностью»
+    "masuliyati", "cheklangan", "ogranichennoy", "otvetstvennostyu",
+    # «Aksiyadorlik Jamiyati» (AJ), ochiq/yopiq turlari
+    "aksiyadorlik", "ochiq", "yopiq",
 }
+
+# kirill homoglif harflari (lotinga vizual mos) — ID'larda: «НАН» (kirill) == «HAH» (lotin).
+# translit fonetik (Н->n) beradi, bu yerda esa VIZUAL moslik kerak (Н->H).
+_HOMOGLYPH = str.maketrans({
+    "А": "A", "В": "B", "Е": "E", "К": "K", "М": "M", "Н": "H", "О": "O",
+    "Р": "P", "С": "C", "Т": "T", "У": "Y", "Х": "X", "І": "I", "Ј": "J",
+    "а": "a", "в": "b", "е": "e", "к": "k", "м": "m", "н": "h", "о": "o",
+    "р": "p", "с": "c", "т": "t", "у": "y", "х": "x",
+})
+
+
+def _strip_diacritics(s: str) -> str:
+    """ý->y, é->e, ñ->n ... — aks holda [^a-z] filtri ularni bo'sh joyga aylantirib
+    so'zni buzadi (Derýaplastik -> «der aplastik»)."""
+    s = unicodedata.normalize("NFKD", s)
+    return "".join(c for c in s if not unicodedata.combining(c))
+
+
+def _fold_word(w: str) -> str:
+    """Bitta so'zni normalizatsiya kaliti shakliga (translit + diakritik + x->h)."""
+    w = _strip_diacritics(_translit(str(w).lower())).replace("x", "h")
+    return re.sub(r"[^0-9a-z]", "", w)
+
+
+# joy nomlari gazetteeri: bir shaharning uz/ru/en variantlari (Buxoro=Buhara=Бухара,
+# Toshkent=Tashkent) fuzzy bilan yutilmaydi (unli farqlari) — kanonik shaklga keltiramiz
+_PLACE_CANON: dict[str, str] = {}
+for _grp in [
+    ["Buxoro", "Buhara", "Bukhara", "Бухара"],
+    ["Toshkent", "Tashkent", "Ташкент"],
+    ["Samarqand", "Samarkand", "Самарканд"],
+    ["Andijon", "Andijan", "Андижан"],
+    ["Namangan", "Наманган"],
+    ["Navoiy", "Navoi", "Навои"],
+    ["Urganch", "Urgench", "Ургенч"],
+    ["Nukus", "Нукус"],
+    ["Qarshi", "Karshi", "Карши"],
+    ["Termiz", "Termez", "Термез"],
+    ["Guliston", "Gulistan", "Гулистан"],
+    ["Xiva", "Khiva", "Хива"],
+]:
+    _canon = _fold_word(_grp[0])
+    for _name in _grp:
+        _PLACE_CANON[_fold_word(_name)] = _canon
 
 
 def _norm_text(s: Any) -> str:
-    s = _translit(str(s).lower())
-    # tinish belgilarini (defis, qo'shtirnoq, nuqta, apostrof...) bo'sh joyga
+    s = _strip_diacritics(_translit(str(s).lower()))
+    # o'zbekcha x <-> h / rus х varianti (Buxoro<->Buhara, Suxrob<->Suhrob) — ikkala
+    # tomon bir xil fold qilinadi, shuning uchun mavjud mosliklarni buzmaydi
+    s = s.replace("x", "h")
+    # so'z ICHIDAGI apostrofni olib tashlaymiz (bo'sh joyga emas) — aks holda
+    # «mas'uliyati» -> «mas»+«uliyati» ikkiga bo'linadi va legal-form sifatida
+    # tanilmaydi; «O'zbekiston» -> «ozbekiston» ham bir so'z bo'lib qoladi
+    s = re.sub(r"[’'`ʻʼ´]", "", s)
+    # qolgan tinish belgilarini (defis, qo'shtirnoq, nuqta...) bo'sh joyga
     s = re.sub(r"[^0-9a-z\s]", " ", s)
-    return " ".join(t for t in s.split() if t not in _LEGAL_FORMS)
+    # legal-form'larni tashla, joy nomlarini kanonik shaklga keltir
+    return " ".join(_PLACE_CANON.get(t, t) for t in s.split() if t not in _LEGAL_FORMS)
 
 
 def _num(v: Any) -> float | None:
@@ -106,15 +193,95 @@ def _cmp_date(ours: Any, theirs: Any) -> tuple[str, float]:
 
 
 def _cmp_id(ours: Any, theirs: Any) -> tuple[str, float]:
-    a = re.sub(r"[\s\-–—]", "", str(ours)).upper().lstrip("№#")
-    b = re.sub(r"[\s\-–—]", "", str(theirs)).upper().lstrip("№#")
+    def norm(v: Any) -> str:
+        v = str(v).translate(_HOMOGLYPH)  # kirill homoglifni lotinga (НАН->HAH)
+        # № va # belgilarini HAR JOYDAN olib tashlaymiz («KEM-OZO №03/02» ichida ham),
+        # bo'shliq/defisni ham — «KEM-OZO № 03/02» == «KEMOZO03/02»
+        return re.sub(r"[\s\-–—№#]", "", v).upper()
+    a, b = norm(ours), norm(theirs)
     return ("match" if a == b else "mismatch"), (1.0 if a == b else 0.0)
 
 
 def _cmp_text(ours: Any, theirs: Any) -> tuple[str, float]:
-    score = fuzz.token_sort_ratio(_norm_text(ours), _norm_text(theirs)) / 100
+    a, b = _norm_text(ours), _norm_text(theirs)
+    # token_set ham: bir tomon ikkinchisining QISQARTMASI/subset bo'lsa (API ko'pincha
+    # qisqaroq — «...Hususiy Korxonasi» vs «...XK», «г.Ашхабад, Туркменистан» vs «г.Ашхабад»)
+    # token_sort past baho beradi, token_set esa to'g'ri.
+    score = max(fuzz.token_sort_ratio(a, b), fuzz.token_set_ratio(a, b)) / 100
     ok = score >= settings.compare_fuzzy_threshold
     return ("match" if ok else "mismatch"), round(score, 3)
+
+
+# manzillardagi umumiy/tur so'zlari — solishtirishda e'tiborga olinmaydi
+# (har manzilda bor: viloyat/область, tuman/район, ko'cha, uy...). Faqat atoqli
+# otlar (shahar/tuman/mahalla nomlari) taqqoslanadi.
+_ADDR_GENERIC = {
+    "tuman", "tumani", "rayon", "rayona", "rayoni", "viloyat", "viloyati",
+    "oblast", "oblasti", "shahar", "shahri", "shaxar", "gorod", "goroda",
+    "respublika", "respublikasi", "respubliki", "dom", "uyi", "ulitsa",
+    "kocha", "kochasi", "mahalla", "mahallasi", "mfy", "mfj", "territoriya",
+    "territoriyasi", "dvor", "street", "building", "poselok", "qishloq",
+    "kishlak", "aholi", "punkti", "obl", "prospekt", "proezd",
+    # ma'muriy/tavsif so'zlari (en/uz/ru) — proper ot emas, solishtirishda tashlanadi.
+    # «Free Economic Zone» == «erkin iqtisodiy zonasi», «Massif» == «massivi»
+    "region", "district", "city", "town", "village", "area", "zone", "zona",
+    "zonasi", "free", "erkin", "ozod", "svobodnaya", "svobodnoy", "economic",
+    "iqtisodiy", "ekonomicheskaya", "ekonomicheskoy", "hudud", "hududi",
+    "hududiy", "massif", "massiv", "massivi", "massiva", "industrial", "sanoat",
+    "promyshlennaya", "sez", "fez", "eiz", "road", "avenue", "block", "kvartal",
+    "mikrorayon", "microrayon", "mfj", "house",
+    # o'zbekiston/respublika o'zi — Uz tomon manzilida DOIM bor, farqlovchi emas
+    "republic", "uzbekistan", "ozbekiston", "uzbekiston", "ozbekistan",
+}
+
+# rus toponimik SIFAT qo'shimchalari (translitdan keyin, lotinda) — «Сырдарьинская
+# область», «Каршинский район», «Каганский район» kabi shakllarni o'zak toponimga
+# keltirish uchun kesiladi: сырдарьинская->sirdar, каршинский->karsh, каганский->kagan.
+# Shunda API'dagi o'zbekcha OT shakli (Sirdaryo, Qarshi, Kagan) bilan mos keladi.
+_ADJ_SUFFIXES = (
+    "inskaya", "inskoy", "inskiy", "evskaya", "evskiy", "ovskaya", "ovskiy",
+    "skaya", "skoy", "skoe", "skie", "skogo", "skom", "skiy", "skij",
+)
+
+
+def _addr_tokens(s: Any) -> list[str]:
+    """Manzildan atoqli ot tokenlari (>=4 harf, tur/umumiy so'z emas)."""
+    return [t for t in _norm_text(s).split() if len(t) >= 4 and t not in _ADDR_GENERIC]
+
+
+def _toponym_root(tok: str) -> str:
+    """Toponim o'zagi: rus sifat qo'shimchasini kesib, q->k folding va gazetteer
+    kanonini qo'llaydi. «каршинский»->karsh, «сырдарьинская»->sirdar, «qarshi»->qarshi
+    (q->k->karshi->gazetteer->qarshi). Shu bilan sifat/ot va q/k tafovutlari yutiladi."""
+    t = tok
+    for suf in _ADJ_SUFFIXES:
+        if t.endswith(suf) and len(t) - len(suf) >= 4:
+            t = t[: -len(suf)]
+            break
+    t = t.replace("q", "k")  # Qarshi==Karshi, Qashqadaryo==Kashkadaryo
+    return _PLACE_CANON.get(t, t)
+
+
+def _cmp_address(ours: Any, theirs: Any) -> tuple[str, float]:
+    """Manzil: bir tomon (odatda API) qisqaroq — uning atoqli otlari ikkinchisida
+    (fuzzy) uchrasa match. Toshkent↔Ташкент, tuman↔район farqlari shunda yutiladi.
+    Har tokendan toponim O'ZAGI olinadi (rus sifat qo'shimchasi kesiladi), shuning
+    uchun «Сырдарьинская»↔«Sirdaryo», «Каршинский»↔«Qarshi» ham mos keladi."""
+    toks_a, toks_b = _addr_tokens(ours), _addr_tokens(theirs)
+    if not toks_a or not toks_b:
+        return _cmp_text(ours, theirs)  # atoqli ot yo'q — oddiy matn solishtiruvi
+    roots_a = [_toponym_root(t) for t in toks_a]
+    roots_b = [_toponym_root(t) for t in toks_b]
+    # kamroq atoqli otga ega tomonni ikkinchisida qidiramiz (subset mantiqi):
+    # har bir o'zak ikkinchi tomon o'zaklaridan birortasiga fuzzy mos kelsa — topildi
+    (short, long_roots) = (roots_b, roots_a) if len(roots_b) <= len(roots_a) \
+        else (roots_a, roots_b)
+    found = sum(
+        1 for s in short
+        if s and any(l and fuzz.partial_ratio(s, l) >= 82 for l in long_roots)
+    )
+    score = found / len(short)
+    return ("match" if score >= 0.6 else "mismatch"), round(score, 3)
 
 
 def _cmp_contains(ours: Any, theirs: Any) -> tuple[str, float]:
@@ -139,6 +306,7 @@ def _code_cmp(fn: Callable) -> Callable:
 
 _COMPARATORS: dict[str, Callable] = {
     "text": _cmp_text,
+    "address": _cmp_address,
     "number": _cmp_number,
     "date": _cmp_date,
     "id": _cmp_id,
@@ -180,24 +348,42 @@ def _bank_attributes_row(extracted: dict, contract: dict, for_side: str) -> dict
     }
 
 
+def _compare_one(extracted: dict, contract: dict, our_path: str, api_path: str, kind: str) -> dict:
+    ours = _get_path(extracted, our_path)
+    theirs = _get_path(contract, api_path)
+    ours_empty = ours is None or (isinstance(ours, str) and not ours.strip())
+    theirs_empty = theirs is None or (isinstance(theirs, str) and not theirs.strip())
+    if theirs_empty:
+        # API'da qiymat yo'q — solishtirishga narsa yo'q (neytral)
+        status, score = ("missing_api" if not ours_empty else "missing_pdf"), 0.0
+    elif ours_empty:
+        # API'da bor, lekin model PDF'dan chiqara olmagan → nomuvofiqlik
+        status, score = "mismatch", 0.0
+    else:
+        status, score = _COMPARATORS[kind](ours, theirs)
+    return {"pdf": ours, "api": theirs, "api_field": api_path, "status": status, "score": score}
+
+
 def _compare_fields(extracted: dict, contract: dict, orientation: str) -> dict[str, dict]:
     for_side, uz_side = ("seller", "buyer") if orientation == "import" else ("buyer", "seller")
     out: dict[str, dict] = {}
     for our_tpl, api_path, kind in _FIELD_SPECS:
         our_path = our_tpl.replace("{FOR}", for_side).replace("{UZ}", uz_side)
-        ours = _get_path(extracted, our_path)
-        theirs = _get_path(contract, api_path)
-        if ours is None or (isinstance(ours, str) and not ours.strip()):
-            status, score = "missing_pdf", 0.0
-        elif theirs is None or (isinstance(theirs, str) and not theirs.strip()):
-            status, score = "missing_api", 0.0
-        else:
-            status, score = _COMPARATORS[kind](ours, theirs)
-        out[our_path] = {
-            "pdf": ours, "api": theirs, "api_field": api_path,
-            "status": status, "score": score, "_tpl": our_tpl,
-        }
+        entry = _compare_one(extracted, contract, our_path, api_path, kind)
+        entry["_tpl"] = our_tpl
+        out[our_path] = entry
     out[f"{for_side}.bank.attributes"] = _bank_attributes_row(extracted, contract, for_side)
+    # Грузополучатель / Consignee — yo'nalishdan mustaqil, faqat mos shartnoma turlarida
+    if str(contract.get("cntrType") or "").strip().zfill(2) not in _NO_RECEIVER_TYPES:
+        for our_path, api_path, kind in _RECEIVER_SPECS:
+            entry = _compare_one(extracted, contract, our_path, api_path, kind)
+            entry["_tpl"] = our_path
+            out[our_path] = entry
+    # Грузоотправитель / Производитель / spetsifikatsiya / to'lov — yo'nalishdan mustaqil
+    for our_path, api_path, kind in _EXTRA_SPECS:
+        entry = _compare_one(extracted, contract, our_path, api_path, kind)
+        entry["_tpl"] = our_path
+        out[our_path] = entry
     return out
 
 
@@ -235,6 +421,18 @@ def _name_score(pdf_name: str, api_name: str) -> float:
     return best / 100
 
 
+def _key_tokens(name: str) -> set[str]:
+    """Nomdagi model/o'lcham RAQAMLARI (8004, 50mm, 32212, 500) — mahsulotni
+    farqlovchi belgilar. Katalogda nomlar deyarli bir xil, faqat shu raqamlar
+    farq qiladi; ular umuman mos kelmasa — boshqa mahsulot."""
+    return set(re.findall(r"[a-z]*\d+[a-z]*", _norm_text(name)))
+
+
+# nom o'xshashligi shu chegaradan past bo'lsa, hs/qty tasodifiy mos kelsa ham
+# juftlamaymiz (водонагреватель != фитинг, ikkalasi qty=500 bo'lsa ham)
+_NAME_FLOOR = 0.45
+
+
 def _compare_products(products: list[dict], contract: dict) -> dict:
     goods = [
         g
@@ -243,11 +441,18 @@ def _compare_products(products: list[dict], contract: dict) -> dict:
     ]
     matched, used = [], set()
     for p in products:
+        pk = _key_tokens(p.get("name") or "")
         best_j, best_score = None, 0.0
         for j, g in enumerate(goods):
             if j in used:
                 continue
-            score = _name_score(p.get("name") or "", g.get("itemsName") or "")
+            ns = _name_score(p.get("name") or "", g.get("itemsName") or "")
+            if ns < _NAME_FLOOR:
+                continue  # nomi umuman o'xshamaydi — juftlamaymiz
+            gk = _key_tokens(g.get("itemsName") or "")
+            if pk and gk and pk.isdisjoint(gk):
+                continue  # model/o'lcham raqamlari ziddiyatli (8004 vs 8005) — boshqa mahsulot
+            score = ns
             if p.get("hs_code") and str(p["hs_code"]) == str(g.get("tnCode")):
                 score += 0.3
             qa, qb = _num(p.get("quantity")), _num(g.get("quantity"))
@@ -329,7 +534,8 @@ def compare_contract_data(
         for row in products_cmp["rows"]
         for f in row.get("fields", {}).values()
         if f["status"] == "mismatch"
-    ) + sum(1 for r in products_cmp["rows"] if r.get("status") == "unmatched_pdf")
+    ) + sum(1 for r in products_cmp["rows"] if r.get("status") == "unmatched_pdf") \
+      + len(products_cmp["unmatched_api"])  # API'da bor, PDF'da yo'q tovarlar ham nomuvofiqlik
 
     return {
         "extracted": extracted,

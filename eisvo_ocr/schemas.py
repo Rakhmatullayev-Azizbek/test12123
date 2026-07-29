@@ -31,6 +31,20 @@ class Party(BaseModel):
     bank: BankInfo = Field(default_factory=BankInfo)
 
 
+class ThirdParty(BaseModel):
+    """Shartnomadagi uchinchi shaxs — bir xil shakl: Грузополучатель (receiver),
+    Грузоотправитель (supplier/consignor), Производитель (manufacturer).
+    Ko'pincha asosiy tomon bilan bir xil, lekin farq qilishi ham mumkin."""
+    name: str | None = Field(None, description="To'liq nomi")
+    country: str | None = None
+    address: str | None = Field(None, description="Manzili / joyi")
+    inn: str | None = Field(None, description="INN/STIR, bo'lsa")
+
+
+# eski nom bilan moslik (receiver shu shakldan foydalanadi)
+Consignee = ThirdParty
+
+
 class DeliveryTerms(BaseModel):
     incoterms: str | None = Field(None, description="Incoterms 2020 (EXW/FCA/.../DPU/DDP)")
     place: str | None = Field(None, description="Yetkazib berish joyi")
@@ -43,10 +57,20 @@ class ContractMeta(BaseModel):
     contract_date: str | None = Field(None, description="ISO formatda: YYYY-MM-DD")
     seller: Party = Field(default_factory=Party)
     buyer: Party = Field(default_factory=Party)
+    receiver: ThirdParty = Field(default_factory=ThirdParty)      # Грузополучатель / Consignee
+    supplier: ThirdParty = Field(default_factory=ThirdParty)      # Грузоотправитель / Consignor / Shipper
+    manufacturer: ThirdParty = Field(default_factory=ThirdParty)  # Производитель / Manufacturer
     delivery: DeliveryTerms = Field(default_factory=DeliveryTerms)
-    currency: str | None = Field(None, description="Valyuta kodi: USD/EUR/UZS/...")
+    currency: str | None = Field(None, description="Shartnoma valyutasi kodi: USD/EUR/UZS/...")
+    payment_currency: str | None = Field(
+        None, description="To'lov valyutasi (shartnoma valyutasidan farq qilsa)")
     total_amount: float | None = Field(None, description="Shartnoma umumiy summasi")
-    payment_terms: str | None = Field(None, description="To'lov shartlari (qisqacha)")
+    payment_terms: str | None = Field(None, description="To'lov USULI (avans/akkreditiv/CAD...)")
+    payment_deadline: str | None = Field(
+        None, description="To'lov MUDDATI — kun/oy soni (masalan '180 kun')")
+    contract_type: str | None = Field(None, description="Shartnoma turi (matnda ko'rsatilgan bo'lsa)")
+    specification_number: str | None = Field(
+        None, description="Spetsifikatsiya/ilova raqami (faqat identifikator, masalan '1')")
 
 
 class Product(BaseModel):

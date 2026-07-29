@@ -64,8 +64,14 @@ def assemble(doc: OcrDocument) -> AssembledDocument:
     open_table_meta: tuple[int, list[float], int] | None = None  # (page, x_centers, n_cols)
     open_table_md_slot: int | None = None  # markdown'da jadval turadigan joy indeksi
 
-    for page in doc.pages:
-        page_blocks = [b for b in page.blocks if b.kind not in ("page-header", "page-footer")]
+    for page_idx, page in enumerate(doc.pages):
+        # 1-sahifa tepasidagi blok ko'pincha hujjat SARLAVHASI (КОНТРАКТ №..., sana) —
+        # Surya uni "PageHeader" deb tasniflaydi. Bu takrorlanuvchi kolontitul EMAS,
+        # shuning uchun 1-sahifada page-header'ni SAQLAYMIZ (aks holda shartnoma
+        # raqami/sanasi butunlay yo'qoladi). Footer (sahifa raqami) esa doim tashlanadi;
+        # keyingi sahifalarda header ham takrorlanuvchi kolontitul — tashlanadi.
+        drop = ("page-footer",) if page_idx == 0 else ("page-header", "page-footer")
+        page_blocks = [b for b in page.blocks if b.kind not in drop]
         for pos, block in enumerate(page_blocks):
             if block.kind == "table" and block.table and block.table.cells:
                 table = block.table

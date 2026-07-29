@@ -23,7 +23,8 @@ class Settings(BaseSettings):
     vllm_api_key: str = "EMPTY"
     llm_model: str = "Qwen/Qwen3-14B-AWQ"
     llm_temperature: float = 0.0
-    llm_max_tokens: int = 4096            # javob uchun; kontekstga sig'masa avto-kamayadi
+    llm_max_tokens: int = 8192            # javob uchun; kontekstga sig'masa avto-kamayadi
+                                          # (ko'p tovarli jadvallar uzun JSON beradi)
     llm_context_len: int = 20480          # server --max-model-len bilan bir xil bo'lsin
     llm_max_input_chars: int = 55_000     # juda uzun hujjatlar uchun himoya chegarasi (~16k token)
     llm_timeout: float = 600.0

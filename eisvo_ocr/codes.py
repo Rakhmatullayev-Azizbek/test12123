@@ -45,7 +45,7 @@ COUNTRY_NUM2NAMES: dict[str, list[str]] = {
     "795": ["TM", "Turkmenistan", "Туркменистан", "Turkmaniston"],
     "004": ["AF", "Afghanistan", "Афганистан", "Afg'oniston"],
     "276": ["DE", "Germany", "Германия", "Germaniya", "BRD", "ФРГ"],
-    "792": ["TR", "Turkey", "Türkiye", "Турция", "Turkiya"],
+    "792": ["TR", "Turkey", "Turkish", "Türkiye", "Turkiye", "Турция", "Turkiya"],
     "410": ["KR", "Korea", "Южная Корея", "Koreya", "Republic of Korea"],
     "392": ["JP", "Japan", "Япония", "Yaponiya"],
     "356": ["IN", "India", "Индия", "Hindiston"],
@@ -81,7 +81,8 @@ COUNTRY_NUM2NAMES: dict[str, list[str]] = {
 
 # --- O'lchov birligi klassifikatori (OKEI) ---
 UNIT_CODE2NAMES: dict[str, list[str]] = {
-    "796": ["шт", "шт.", "штука", "штук", "дона", "dona", "pcs", "piece", "pc"],
+    "796": ["шт", "шт.", "штука", "штук", "дона", "dona", "pcs", "piece", "pc",
+            "unit", "units", "ед", "ед.", "единица", "единиц", "birlik", "birlik dona"],
     "166": ["кг", "кг.", "kg", "килограмм", "kilogramm"],
     "168": ["т", "тонна", "tonna", "ton", "mt"],
     "006": ["м", "метр", "metr", "m"],
@@ -108,12 +109,48 @@ INCOTERMS_CODE2TERM = {
 _INCOTERMS_EQUIV = {"DAT": "DPU", "DAF": "DAP", "DES": "DAP", "DEQ": "DPU", "DDU": "DAP"}
 
 
+# valyutaning PDF'dagi so'z shakllari (translit qilingan, lotin) — «доллары США»,
+# «долл.», «USD», «$» hammasi 840 (USD) ga to'g'ri kelsin. Kalit — harfli kod.
+CURRENCY_ALIASES: dict[str, list[str]] = {
+    "USD": ["usd", "dollar", "doll", "$"],
+    "EUR": ["eur", "evro", "euro", "€"],
+    "UZS": ["uzs", "sum", "som"],
+    "RUB": ["rub", "rubl", "ruble"],
+    "CNY": ["cny", "yuan", "juan", "rmb", "renminbi"],
+    "GBP": ["gbp", "funt", "pound", "sterling", "£"],
+    "JPY": ["jpy", "iena", "yen"],
+    "CHF": ["chf", "frank", "franc", "shveycar"],
+    "KZT": ["kzt", "tenge"],
+    "KGS": ["kgs", "som", "sum"],
+    "TJS": ["tjs", "somoni"],
+    "TRY": ["try", "lira"],
+    "AED": ["aed", "dirham", "dirxam"],
+    "KRW": ["krw", "von", "won"],
+    "INR": ["inr", "rupi", "rupee"],
+    "AZN": ["azn", "manat"],
+    "TMT": ["tmt", "manat"],
+    "GEL": ["gel", "lari"],
+    "AMD": ["amd", "dram"],
+}
+
+
 def currency_matches(pdf_value: str, api_code: str) -> bool | None:
-    """None = kodni bilmaymiz (taqqoslab bo'lmaydi)."""
+    """None = kodni bilmaymiz (taqqoslab bo'lmaydi). Valyuta PDF'da har xil
+    ko'rinishda yozilishi mumkin («доллары США», «долл.», «USD», «$») —
+    barchasini harfli kodga bog'laymiz."""
     alpha = CURRENCY_NUM2ALPHA.get(str(api_code).strip())
     if alpha is None:
         return None
-    return str(pdf_value).strip().upper() == alpha
+    v = _translit(str(pdf_value).strip().lower())
+    v = re.sub(r"[^a-z0-9$€£]+", " ", v).strip()  # $ € £ belgilarini saqlaymiz
+    if not v:
+        return False
+    if v == alpha.lower():
+        return True
+    return any(
+        kw and (kw in v or v in kw)
+        for kw in CURRENCY_ALIASES.get(alpha, [alpha.lower()])
+    )
 
 
 def country_matches(pdf_value: str, api_code: str) -> bool | None:
