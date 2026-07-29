@@ -1,0 +1,38 @@
+# ── 2-KOMPYUTER uchun: FAQAT web ──────────────────────────────────────────────
+# Og'ir modellar (Qwen + Surya recognition) 1-KOMPYUTERda ishlaydi; bu yerdagi web
+# ularga masofadan (ngrok / Tailscale) ulanadi. Layout + jadval kichik modellari shu
+# yerda (GPU) ishlaydi.
+#
+# Sozlash: .env fayliga model URL'larini to'liq yozing (usulga qarab):
+#   ngrok:      EISVO_VLLM_BASE_URL=https://<qwen>.ngrok-free.app/v1
+#               SURYA_INFERENCE_URL=https://<surya>.ngrok-free.app/v1
+#   Tailscale:  EISVO_VLLM_BASE_URL=http://100.x.x.x:8000/v1
+#               SURYA_INFERENCE_URL=http://100.x.x.x:8001/v1
+# Ishga tushirish:  docker compose -f docker-compose.web.yml up -d --build
+# Ochish:           http://localhost:8080
+services:
+  web:
+    build: .
+    entrypoint: ["uvicorn", "eisvo_ocr.server:app", "--host", "0.0.0.0", "--port", "8080"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - hf-cache:/models
+      - ./data:/data
+      - ./eisvo_ocr:/app/eisvo_ocr   # manba kodi live
+    gpus: all                        # layout + jadval modellari uchun (2-kompyuterda GPU bor)
+    environment:
+      # 1-KOMPYUTERdagi model serverlari — TO'LIQ URL (.env'dan):
+      - EISVO_VLLM_BASE_URL=${EISVO_VLLM_BASE_URL}
+      - SURYA_INFERENCE_URL=${SURYA_INFERENCE_URL}
+      # agar 1-kompyuterda Qwen vLLM --api-key bilan himoyalangan bo'lsa:
+      - EISVO_VLLM_API_KEY=${EISVO_VLLM_API_KEY:-EMPTY}
+      # EISVO API (ID orqali shartnoma olish) — kerak bo'lsa:
+      - EISVO_API_URL=${EISVO_API_URL:-}
+      - EISVO_API_TOKEN=${EISVO_API_TOKEN:-}
+      - EISVO_API_ID_FIELD=${EISVO_API_ID_FIELD:-idn}
+      - EISVO_API_BODY_FILE=${EISVO_API_BODY_FILE:-}
+      - EISVO_API_BODY=${EISVO_API_BODY:-}
+
+volumes:
+  hf-cache:

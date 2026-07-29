@@ -1,0 +1,18 @@
+# Maxfiy — HECH QACHON commit qilinmasin (token, URL)
+.env
+data/api_body.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Lokal natijalar / vaqtinchalik
+data/results/
+data/results_before/
+data/results_prev/
+data/_*.py
+
+# IDE
+.idea/
+.vscode/

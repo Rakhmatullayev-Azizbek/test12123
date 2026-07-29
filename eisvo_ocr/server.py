@@ -17,10 +17,11 @@ import tempfile
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import eisvo_client
 from .config import settings
 from .pipeline import compare_with_api, process_pdf
 
@@ -54,16 +55,30 @@ def health():
     }
 
 
+@app.get("/api/config")
+def api_config():
+    """Frontend uchun: EISVO API ID-rejimi sozlanganmi (URL bor-yo'qligi)."""
+    return {"api_lookup": bool(settings.eisvo_api_url.strip())}
+
+
 @app.post("/api/process")
 def api_process(
     pdf: UploadFile = File(...),
+    contract_id: str | None = Form(None),
     api_json: UploadFile | None = File(None),
 ):
     if not (pdf.filename or "").lower().endswith(".pdf"):
         raise HTTPException(400, "PDF fayl kutilyapti")
 
     api_data = None
-    if api_json is not None and api_json.filename:
+    # 1-ustuvor: kiritilgan ID bo'yicha EISVO API'dan olish
+    if contract_id and contract_id.strip():
+        try:
+            api_data = eisvo_client.fetch_contract(contract_id.strip())
+        except eisvo_client.EisvoApiError as e:
+            raise HTTPException(502, f"EISVO API: {e}")
+    # (eski/zaxira yo'l) to'g'ridan-to'g'ri JSON fayl yuklangan bo'lsa
+    elif api_json is not None and api_json.filename:
         try:
             api_data = json.loads(api_json.file.read().decode("utf-8-sig"))
         except (UnicodeDecodeError, json.JSONDecodeError) as e:

@@ -148,7 +148,11 @@
         <input type="file" id="pdf" accept=".pdf">
       </div>
       <div class="field">
-        <label>EISVO API JSON (ixtiyoriy)</label>
+        <label>Shartnoma ID (server EISVO API'ga ulansa)</label>
+        <input type="text" id="contractId" placeholder="masalan: ZAP-0312" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>yoki EISVO API JSON fayli</label>
         <input type="file" id="apijson" accept=".json,application/json">
       </div>
       <div><button class="primary" id="run">Tekshirish</button></div>
@@ -248,7 +252,9 @@ $("run").onclick = async () => {
   if (!pdf) { alert("PDF tanlang"); return; }
   const fd = new FormData();
   fd.append("pdf", pdf);
-  if ($("apijson").files[0]) fd.append("api_json", $("apijson").files[0]);
+  const cid = $("contractId").value.trim();
+  if (cid) fd.append("contract_id", cid);          // 1-ustuvor: server API'ga ID bilan
+  else if ($("apijson").files[0]) fd.append("api_json", $("apijson").files[0]);  // yoki JSON fayl
 
   $("err").style.display = "none"; $("results").innerHTML = "";
   $("spin").style.display = "block"; $("run").disabled = true;

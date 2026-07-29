@@ -68,6 +68,12 @@ services:
     environment:
       - EISVO_VLLM_BASE_URL=http://vllm:8000/v1
       - SURYA_INFERENCE_URL=http://surya:8000/v1
+      # EISVO API (ID orqali shartnoma olish) — qiymatlar host .env'dan olinadi
+      - EISVO_API_URL=${EISVO_API_URL:-}
+      - EISVO_API_TOKEN=${EISVO_API_TOKEN:-}
+      - EISVO_API_ID_FIELD=${EISVO_API_ID_FIELD:-idn}
+      - EISVO_API_BODY_FILE=${EISVO_API_BODY_FILE:-}
+      - EISVO_API_BODY=${EISVO_API_BODY:-}
     depends_on:
       surya:
         condition: service_healthy

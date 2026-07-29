@@ -146,6 +146,9 @@ def _client() -> OpenAI:
         base_url=settings.vllm_base_url,
         api_key=settings.vllm_api_key,
         timeout=settings.llm_timeout,
+        # ngrok bepul tunnel HTML "browser warning" sahifasini ko'rsatmasligi uchun
+        # (to'g'ridan-to'g'ri vLLM'da zararsiz — noma'lum header e'tiborsiz qoladi)
+        default_headers={"ngrok-skip-browser-warning": "true"},
     )
 
 
@@ -179,7 +182,7 @@ def _guided_call(prompt: str, schema_model: type[BaseModel]) -> BaseModel:
     est_input_tokens = (len(_SYSTEM) + len(prompt)) // 2 + 500
     max_out = max(1024, min(settings.llm_max_tokens,
                             settings.llm_context_len - est_input_tokens))
-    resp = _client().chat.completions.create(
+    common = dict(
         model=settings.llm_model,
         temperature=settings.llm_temperature,
         max_tokens=max_out,
@@ -198,8 +201,24 @@ def _guided_call(prompt: str, schema_model: type[BaseModel]) -> BaseModel:
             "chat_template_kwargs": {"enable_thinking": False},
         },
     )
-    raw = resp.choices[0].message.content or "{}"
-    finish = resp.choices[0].finish_reason
+    if settings.llm_stream:
+        # Streaming: uzun javob (ko'p tovarli PRODUCTS) davomida ulanish uzluksiz
+        # ma'lumot oqib turadi — masofaviy proksilar (Cloudflare Tunnel ~100s) uzmaydi.
+        parts: list[str] = []
+        finish = None
+        for chunk in _client().chat.completions.create(stream=True, **common):
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if delta and delta.content:
+                parts.append(delta.content)
+            if chunk.choices[0].finish_reason:
+                finish = chunk.choices[0].finish_reason
+        raw = "".join(parts) or "{}"
+    else:
+        resp = _client().chat.completions.create(**common)
+        raw = resp.choices[0].message.content or "{}"
+        finish = resp.choices[0].finish_reason
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:

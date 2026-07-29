@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     llm_context_len: int = 20480          # server --max-model-len bilan bir xil bo'lsin
     llm_max_input_chars: int = 55_000     # juda uzun hujjatlar uchun himoya chegarasi (~16k token)
     llm_timeout: float = 600.0
+    llm_stream: bool = True               # javobni oqim (streaming) bilan olish — masofaviy
+                                          # proksi (Cloudflare ~100s) uzun javobni uzmasligi uchun
 
     # [6] Validator
     arithmetic_rel_tolerance: float = 0.01    # 1% — OCR yaxlitlash xatolari uchun
@@ -35,6 +37,15 @@ class Settings(BaseSettings):
 
     # [7] Comparison
     compare_fuzzy_threshold: float = 0.85
+
+    # EISVO API — ID orqali shartnoma JSON'ini olish (JSON yuklash o'rniga).
+    # POST so'rovi: body = (required maydonlar) + {id_field: kiritilgan ID}, Bearer token bilan.
+    eisvo_api_url: str = ""             # POST endpoint to'liq URL (.env: EISVO_API_URL)
+    eisvo_api_token: str = ""           # Bearer token (.env: EISVO_API_TOKEN) — muddати tugasa yangilanadi
+    eisvo_api_id_field: str = "idn"     # so'rov body'sida ID qaysi kalit bilan yuboriladi
+    eisvo_api_body: str = ""            # boshqa REQUIRED maydonlar — inline JSON (ixtiyoriy)
+    eisvo_api_body_file: str = ""       # ...yoki JSON fayl yo'li (mas. /data/api_body.json) — afzal
+    eisvo_api_timeout: float = 30.0
 
 
 settings = Settings()
