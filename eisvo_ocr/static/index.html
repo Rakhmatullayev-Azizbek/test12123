@@ -210,6 +210,7 @@ const badge = (s) => {
 };
 
 const FIELD_LABELS = {
+  "contract_type": "Shartnoma turi (import/eksport)",
   "contract_number": "Shartnoma raqami", "contract_date": "Shartnoma sanasi",
   "currency": "Shartnoma valyutasi", "total_amount": "Shartnoma umumiy summasi",
   "seller.name": "Sotuvchi nomi", "seller.country": "Sotuvchi davlati",
@@ -373,7 +374,10 @@ function render(d) {
           : "Taqqoslangan barcha maydonlar API ma'lumotlariga mos"}</div>
       </div>
     </div>`;
+    const ctype = d.comparison.contract_type_uz
+      || (d.comparison.contract_type === "export" ? "Eksport" : "Import");
     html += `<div class="kpis">
+      <div class="kpi"><b>${ctype}</b><span>Shartnoma turi</span></div>
       <div class="kpi"><b>${c.match + c.mismatch}</b><span>Taqqoslandi</span></div>
       <div class="kpi k-ok"><b>${c.match}</b><span>Moslik</span></div>
       <div class="kpi k-bad"><b>${c.mismatch}</b><span>Nomoslik</span></div>

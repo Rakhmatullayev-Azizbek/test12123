@@ -85,8 +85,10 @@ UNIT_CODE2NAMES: dict[str, list[str]] = {
             "unit", "units", "ед", "ед.", "единица", "единиц", "birlik", "birlik dona",
             # EISVO sanaladigan (diskret) birliklarni ko'pincha 796 bilan kodlaydi:
             # комплект/набор/кассета — bittalab sanaladi, штука bilan mos deб qabul qilamiz
+            # inglizcha "set"/"sets" ham набор/комплект ning tarjimasi (PDF ingliz tilida
+            # bo'lsa model shuni chiqaradi) — 796 bilan mos deb qabul qilamiz
             "комплект", "комплекты", "komplekt", "набор", "наборы", "nabor",
-            "кассета", "кассеты", "kasseta"],
+            "кассета", "кассеты", "kasseta", "set", "sets"],
     "166": ["кг", "кг.", "kg", "килограмм", "kilogramm"],
     "168": ["т", "тонна", "tonna", "ton", "mt"],
     "006": ["м", "метр", "metr", "m"],
@@ -136,6 +138,21 @@ CURRENCY_ALIASES: dict[str, list[str]] = {
     "GEL": ["gel", "lari"],
     "AMD": ["amd", "dram"],
 }
+
+
+# --- EISVO shartnoma turi (cntrType): yo'nalish kodi ---
+# API cntrType "01" = eksport (O'zbek tomon sotuvchi), "02" = import (O'zbek tomon xaridor).
+# Boshqa kodlar (xizmat/ish shartnomalari va h.k.) yo'nalishga bog'lanmaydi.
+CNTRTYPE_CODE2ORIENTATION = {"01": "export", "02": "import"}
+
+
+def contract_type_matches(pdf_orientation: str, api_cntrtype: str) -> bool | None:
+    """PDF'dan aniqlangan yo'nalish (export/import) API cntrType kodiga mos keladimi.
+    None = API kodi import/eksportga tegishli emas (taqqoslab bo'lmaydi)."""
+    api = CNTRTYPE_CODE2ORIENTATION.get(str(api_cntrtype or "").strip().zfill(2))
+    if api is None:
+        return None
+    return str(pdf_orientation or "").strip().lower() == api
 
 
 def _same_numeric_code(pdf_value: str, api_code: str) -> bool:

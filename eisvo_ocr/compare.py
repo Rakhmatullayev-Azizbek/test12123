@@ -16,7 +16,9 @@ from typing import Any, Callable
 from rapidfuzz import fuzz
 
 from .codes import (
+    CNTRTYPE_CODE2ORIENTATION,
     _translit,
+    contract_type_matches,
     country_matches,
     currency_matches,
     incoterms_matches,
@@ -419,14 +421,42 @@ def _compare_fields(extracted: dict, contract: dict, orientation: str) -> dict[s
     return out
 
 
+def _party_is_uz(extracted: dict, side: str) -> bool | None:
+    """Tomon (seller/buyer) O'zbekiston (kod 860) tomonimi?
+    True = O'zbek, False = chet el, None = mamlakat ko'rsatilmagan (aniqlab bo'lmadi)."""
+    c = str(_get_path(extracted, f"{side}.country") or "").strip()
+    if not c:
+        return None
+    return country_matches(c, "860") is True
+
+
+def _uz_role_orientation(extracted: dict) -> str | None:
+    """Shartnoma turini TO'G'RIDAN-TO'G'RI O'zbek tomonning roli bo'yicha aniqlaymiz:
+    O'zbek tomon (mas. Biznesni Rivojlantirish Banki mijozi) SOTUVCHI bo'lsa — EKSPORT
+    (tovar O'zbekistondan chiqadi), XARIDOR bo'lsa — IMPORT (tovar O'zbekistonga kiradi).
+    Bizning konvensiya: orientation "import" -> Uz=buyer, "export" -> Uz=seller.
+    Ikkala tomon mamlakati aniq bo'lmasa (yoki ikkalasi ham O'zbek/chet el) None."""
+    seller_uz = _party_is_uz(extracted, "seller")
+    buyer_uz = _party_is_uz(extracted, "buyer")
+    if seller_uz and buyer_uz is not True:   # sotuvchi O'zbek, xaridor chet el/noma'lum
+        return "export"
+    if buyer_uz and seller_uz is not True:    # xaridor O'zbek, sotuvchi chet el/noma'lum
+        return "import"
+    return None
+
+
 def _detect_orientation(extracted: dict, contract: dict) -> tuple[str, dict[str, dict]]:
-    """Import/eksportni aniqlash: qaysi biriktirishda nomlar ko'proq mos kelsa — o'sha."""
+    """Import/eksportni aniqlash. Avvalo O'zbek tomonning roli bo'yicha to'g'ridan-to'g'ri
+    (seller O'zbek->export, buyer O'zbek->import). Mamlakatdan aniqlab bo'lmasa —
+    qaysi biriktirishda nomlar API'ga ko'proq mos kelsa, o'shanga qaytamiz."""
     results = {o: _compare_fields(extracted, contract, o) for o in ("import", "export")}
-    scores = {
-        o: sum(f["score"] for f in fields.values() if f["_tpl"] in _ORIENTATION_FIELDS)
-        for o, fields in results.items()
-    }
-    orientation = max(scores, key=scores.get)  # teng bo'lsa import (tez-tez uchraydigani)
+    orientation = _uz_role_orientation(extracted)
+    if orientation is None:
+        scores = {
+            o: sum(f["score"] for f in fields.values() if f["_tpl"] in _ORIENTATION_FIELDS)
+            for o, fields in results.items()
+        }
+        orientation = max(scores, key=scores.get)  # teng bo'lsa import (tez-tez uchraydigani)
     fields = results[orientation]
     for f in fields.values():
         f.pop("_tpl", None)
@@ -551,6 +581,22 @@ def compare_contract_data(
     contract = api_data.get("contract") or api_data
     orientation, fields = _detect_orientation(extracted, contract)
 
+    # Shartnoma turi (import/export) API cntrType bilan solishtiriladi (01=export, 02=import).
+    # Boshqa maydonlar kabi jadvalga qo'shiladi va verdiktga (match/mismatch) kiradi.
+    api_cntrtype = contract.get("cntrType")
+    ct_res = contract_type_matches(orientation, api_cntrtype)
+    ct_label = {"export": "Eksport", "import": "Import"}
+    api_orient = CNTRTYPE_CODE2ORIENTATION.get(str(api_cntrtype or "").strip().zfill(2))
+    fields["contract_type"] = {
+        "pdf": ct_label.get(orientation, orientation),
+        "api": (f"{api_cntrtype} ({ct_label.get(api_orient, '?')})"
+                if api_cntrtype else None),
+        "api_field": "cntrType",
+        "status": ("unknown_code" if ct_res is None
+                   else ("match" if ct_res else "mismatch")),
+        "score": 1.0 if ct_res else 0.0,
+    }
+
     if validation:
         for path, entry in fields.items():
             fconf = validation["fields"].get(path, {}).get("confidence")
@@ -574,6 +620,10 @@ def compare_contract_data(
         "api": api_data,
         "comparison": {
             "orientation": orientation,  # import: Uz tomon = buyer
+            # Shartnoma turi: O'zbek tomon sotuvchi bo'lsa EKSPORT, xaridor bo'lsa IMPORT.
+            # (orientation "export" -> Uz=seller, "import" -> Uz=buyer bilan bir xil)
+            "contract_type": "export" if orientation == "export" else "import",
+            "contract_type_uz": "Eksport" if orientation == "export" else "Import",
             "fields": fields,
             "products": products_cmp,
         },
