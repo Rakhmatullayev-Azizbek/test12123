@@ -3,76 +3,193 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>EISVO LLM OCR</title>
+<title>EISVO AI</title>
 <style>
   :root {
-    --bg: #f4f5f7; --card: #fff; --text: #16181d; --muted: #667085;
-    --border: #e4e7ec; --accent: #2454db; --accent-soft: #eaf0ff;
+    /* BRB brend: #CC4239 (qizil), #413E3C (ko'mir matn), #D2D3D5 (kulrang) */
+    --bg: #ffffff; --surface: #faf7f6; --card: #fff; --text: #413e3c; --muted: #857e79;
+    --border: #e6e2df; --border-soft: #f0edea; --accent: #cc4239; --accent-2: #e26a4d;
+    --accent-soft: #fbeceb; --hover: #f6efee; --sidebar: #faf7f5;
     --ok: #157f3d; --ok-bg: #eaf6ef; --ok-line: #abd8bc;
     --bad: #b42020; --bad-bg: #fdeeee; --bad-line: #f0b6b6;
     --warn: #92510e; --warn-bg: #fdf3e2; --warn-line: #ecc994;
-    --na: #58606e; --na-bg: #eef0f3; --na-line: #d3d8df;
-    --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.04);
+    --na: #6a635e; --na-bg: #f1eeec; --na-line: #ddd7d3;
+    --shadow: 0 1px 2px rgba(65,62,60,.06), 0 1px 3px rgba(65,62,60,.05);
+    --shadow-lg: 0 12px 40px rgba(65,62,60,.16);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0e1116; --card: #181c23; --text: #e8eaee; --muted: #98a1b0;
-      --border: #272d38; --accent: #7fa3ff; --accent-soft: #1a2233;
+      --bg: #14100e; --surface: #1a1613; --card: #1e1a17; --text: #ece7e3; --muted: #a89f98;
+      --border: #332d29; --border-soft: #241f1c; --accent: #ea6b60; --accent-2: #e2794f;
+      --accent-soft: #2c1b18; --hover: #241d1a; --sidebar: #100c0a;
       --ok: #7fd49a; --ok-bg: #12291a; --ok-line: #235c37;
       --bad: #f29a9a; --bad-bg: #331616; --bad-line: #6e2626;
       --warn: #ecc37f; --warn-bg: #33260f; --warn-line: #6e5320;
-      --na: #aab3c0; --na-bg: #222833; --na-line: #3a4250;
-      --shadow: none;
+      --na: #ab9f97; --na-bg: #241f1c; --na-line: #3a332e;
+      --shadow: none; --shadow-lg: 0 12px 40px rgba(0,0,0,.55);
     }
   }
   :root[data-theme="light"] {
-    --bg: #f4f5f7; --card: #fff; --text: #16181d; --muted: #667085;
-    --border: #e4e7ec; --accent: #2454db; --accent-soft: #eaf0ff;
+    --bg: #ffffff; --surface: #faf7f6; --card: #fff; --text: #413e3c; --muted: #857e79;
+    --border: #e6e2df; --border-soft: #f0edea; --accent: #cc4239; --accent-2: #e26a4d;
+    --accent-soft: #fbeceb; --hover: #f6efee; --sidebar: #faf7f5;
     --ok: #157f3d; --ok-bg: #eaf6ef; --ok-line: #abd8bc;
     --bad: #b42020; --bad-bg: #fdeeee; --bad-line: #f0b6b6;
     --warn: #92510e; --warn-bg: #fdf3e2; --warn-line: #ecc994;
-    --na: #58606e; --na-bg: #eef0f3; --na-line: #d3d8df;
-    --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.04);
+    --na: #6a635e; --na-bg: #f1eeec; --na-line: #ddd7d3;
+    --shadow: 0 1px 2px rgba(65,62,60,.06), 0 1px 3px rgba(65,62,60,.05);
+    --shadow-lg: 0 12px 40px rgba(65,62,60,.16);
   }
   :root[data-theme="dark"] {
-    --bg: #0e1116; --card: #181c23; --text: #e8eaee; --muted: #98a1b0;
-    --border: #272d38; --accent: #7fa3ff; --accent-soft: #1a2233;
+    --bg: #14100e; --surface: #1a1613; --card: #1e1a17; --text: #ece7e3; --muted: #a89f98;
+    --border: #332d29; --border-soft: #241f1c; --accent: #ea6b60; --accent-2: #e2794f;
+    --accent-soft: #2c1b18; --hover: #241d1a; --sidebar: #100c0a;
     --ok: #7fd49a; --ok-bg: #12291a; --ok-line: #235c37;
     --bad: #f29a9a; --bad-bg: #331616; --bad-line: #6e2626;
     --warn: #ecc37f; --warn-bg: #33260f; --warn-line: #6e5320;
-    --na: #aab3c0; --na-bg: #222833; --na-line: #3a4250;
-    --shadow: none;
+    --na: #ab9f97; --na-bg: #241f1c; --na-line: #3a332e;
+    --shadow: none; --shadow-lg: 0 12px 40px rgba(0,0,0,.55);
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 15px/1.55 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-         background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
-  .wrap { max-width: 1160px; margin: 0 auto; padding: 22px 16px 72px; }
-  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
-  h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
-  .brand { display: flex; align-items: center; gap: 10px; }
-  .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--accent);
-          display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 15px; }
-  .sub { color: var(--muted); margin: 2px 0 18px; font-size: 13px; }
-  .theme-btn { border: 1px solid var(--border); background: var(--card); color: var(--muted);
-               border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 15px; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  html, body { height: 100%; }
+  body { margin: 0; font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; overflow: hidden; }
+
+  /* ---------- Layout ---------- */
+  .app { display: flex; height: 100dvh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar { width: 268px; flex: none; background: var(--sidebar); border-right: 1px solid var(--border);
+             display: flex; flex-direction: column; transition: margin-left .24s ease, transform .24s ease; }
+  body.sb-collapsed .sidebar { margin-left: -269px; }
+  .sb-head { display: flex; align-items: center; gap: 10px; padding: 14px 14px 10px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -.01em; }
+  .logo { width: 30px; height: 30px; border-radius: 9px; flex: none;
+          background: linear-gradient(135deg, var(--accent), var(--accent-2));
+          display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 15px;
+          box-shadow: 0 2px 8px rgba(204,66,57,.35); }
+  .sb-scroll { flex: 1; overflow-y: auto; padding: 6px 10px; }
+  .sb-section { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+                font-weight: 700; padding: 12px 10px 6px; }
+  .nav-item { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+              padding: 10px 11px; border-radius: 10px; border: 0; background: transparent; color: var(--text);
+              font-size: 14px; font-weight: 550; cursor: pointer; transition: background .15s; }
+  .nav-item:hover { background: var(--hover); }
+  .nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+  .nav-item svg { width: 18px; height: 18px; flex: none; opacity: .85; }
+  .nav-item.active svg { opacity: 1; }
+  .nav-new { border: 1px solid var(--border); margin-bottom: 4px; }
+  .sb-foot { padding: 10px; border-top: 1px solid var(--border); display: flex; align-items: center;
+             justify-content: space-between; gap: 8px; }
+  .sb-user { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); min-width: 0; }
+  .sb-user .ava { width: 28px; height: 28px; border-radius: 50%; flex: none;
+                  background: linear-gradient(135deg, #6b615c, #413e3c); color: #fff; font-weight: 700;
+                  display: grid; place-items: center; font-size: 12px; }
+  .icon-btn { border: 1px solid var(--border); background: var(--card); color: var(--muted); border-radius: 9px;
+              width: 34px; height: 34px; cursor: pointer; font-size: 15px; display: grid; place-items: center;
+              transition: background .15s, color .15s; flex: none; }
+  .icon-btn:hover { background: var(--hover); color: var(--text); }
+
+  /* backdrop for mobile sidebar */
+  .backdrop { position: fixed; inset: 0; background: rgba(8,10,14,.4); opacity: 0; pointer-events: none;
+              transition: opacity .2s; z-index: 40; }
+
+  /* ---------- Main ---------- */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+  .topbar { height: 56px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 14px;
+            border-bottom: 1px solid var(--border-soft); }
+  .burger { width: 40px; height: 40px; border-radius: 10px; border: 0; background: transparent; cursor: pointer;
+            display: grid; place-items: center; color: var(--text); transition: background .15s; }
+  .burger:hover { background: var(--hover); }
+  .burger span { display: block; width: 19px; height: 2px; border-radius: 2px; background: currentColor;
+                 margin: 3.5px 0; transition: .25s; }
+  .top-title { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+  .top-title small { color: var(--muted); font-weight: 500; }
+  .top-spacer { flex: 1; }
+
+  .view { flex: 1; min-height: 0; display: none; flex-direction: column; }
+  .view.active { display: flex; }
+
+  /* ---------- Chat view ---------- */
+  #view-chat { position: relative; }
+  .chat-scroll { flex: 1; overflow-y: auto; }
+  .chat-inner { max-width: 760px; margin: 0 auto; padding: 26px 20px 20px; }
+  .msg { display: flex; gap: 14px; padding: 14px 0; animation: rise .3s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .msg .ava { width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center;
+              font-size: 12px; font-weight: 700; color: #fff; }
+  .msg.ai .ava { background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+  .msg.me .ava { background: linear-gradient(135deg, #6b615c, #413e3c); }
+  .msg .who { font-size: 12.5px; font-weight: 700; color: var(--muted); margin-bottom: 3px; }
+  .msg .bubble { font-size: 15px; line-height: 1.6; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+  .msg .body { min-width: 0; }
+
+  /* empty / greeting */
+  .greet { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+           text-align: center; padding: 24px; }
+  .greet .glogo { width: 60px; height: 60px; border-radius: 18px; margin-bottom: 18px;
+                  background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff;
+                  display: grid; place-items: center; font-size: 27px; font-weight: 800;
+                  box-shadow: 0 8px 26px rgba(204,66,57,.4); }
+  .greet h2 { font-size: 26px; margin: 0 0 6px; letter-spacing: -.02em; }
+  .greet p { color: var(--muted); margin: 0 0 26px; font-size: 14.5px; }
+  .chips { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; width: 100%; max-width: 560px; }
+  .chip { text-align: left; border: 1px solid var(--border); background: var(--card); border-radius: 14px;
+          padding: 14px 16px; cursor: pointer; transition: border-color .15s, transform .1s, box-shadow .15s; }
+  .chip:hover { border-color: var(--accent); box-shadow: var(--shadow); transform: translateY(-1px); }
+  .chip b { display: block; font-size: 14px; margin-bottom: 3px; }
+  .chip span { font-size: 12.5px; color: var(--muted); }
+
+  /* composer */
+  .composer { flex: none; padding: 10px 20px 18px; }
+  .composer-inner { max-width: 760px; margin: 0 auto; }
+  .input-wrap { display: flex; align-items: flex-end; gap: 8px; background: var(--card); border: 1px solid var(--border);
+                border-radius: 22px; padding: 8px 8px 8px 18px; box-shadow: var(--shadow);
+                transition: border-color .15s, box-shadow .15s; }
+  .input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .input-wrap textarea { flex: 1; border: 0; outline: 0; resize: none; background: transparent; color: var(--text);
+                         font: inherit; line-height: 1.5; max-height: 180px; padding: 6px 0; }
+  .send { width: 38px; height: 38px; border-radius: 50%; border: 0; flex: none; cursor: pointer;
+          background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff;
+          display: grid; place-items: center; transition: opacity .15s, transform .1s; }
+  .send:hover { transform: scale(1.05); }
+  .send:disabled { opacity: .4; cursor: default; transform: none; }
+  .send svg { width: 18px; height: 18px; }
+  .composer-note { text-align: center; font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+  .typing { display: inline-flex; gap: 4px; padding: 4px 0; }
+  .typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); opacity: .5;
+              animation: blink 1.2s infinite; }
+  .typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,60%,100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+
+  /* ---------- OCR view ---------- */
+  .ocr-scroll { flex: 1; overflow-y: auto; }
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 24px 20px 72px; }
+  .page-head { margin-bottom: 18px; }
+  .page-head h1 { font-size: 21px; margin: 0 0 3px; letter-spacing: -.015em; }
+  .page-head .sub { color: var(--muted); font-size: 13px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px;
           padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow); }
   .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: end; }
   .field { flex: 1; min-width: 220px; }
   label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; color: var(--muted); }
-  input[type=file] { width: 100%; padding: 9px; border: 1px dashed var(--border); border-radius: 9px;
-                     background: var(--bg); font-size: 13px; color: var(--text); cursor: pointer; }
-  button.primary { background: var(--accent); color: #fff; border: 0; padding: 11px 26px; border-radius: 9px;
-                   font-size: 15px; font-weight: 600; cursor: pointer; }
-  button.primary:disabled { opacity: .5; cursor: default; }
-  .health { font-size: 12px; color: var(--muted); margin-top: 12px; display: flex; gap: 18px; flex-wrap: wrap; }
+  input[type=file], input[type=text] { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px;
+                     background: var(--bg); font-size: 13px; color: var(--text); }
+  input[type=file] { border-style: dashed; cursor: pointer; }
+  input[type=text]:focus, input[type=file]:focus { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  button.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border: 0;
+                   padding: 12px 26px; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer;
+                   box-shadow: 0 2px 10px rgba(204,66,57,.3); transition: transform .1s, box-shadow .15s; }
+  button.primary:hover { transform: translateY(-1px); }
+  button.primary:disabled { opacity: .5; cursor: default; transform: none; }
+  .health { font-size: 12px; color: var(--muted); margin-top: 14px; display: flex; gap: 18px; flex-wrap: wrap; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
   .spinner { display: none; margin: 30px auto 8px; width: 34px; height: 34px; border: 3px solid var(--border);
              border-top-color: var(--accent); border-radius: 50%; animation: spin .9s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   #status-msg { text-align: center; color: var(--muted); font-size: 13px; }
 
-  .verdict { border-radius: 14px; padding: 18px 22px; margin-bottom: 14px; border: 1px solid;
+  .verdict { border-radius: 16px; padding: 18px 22px; margin-bottom: 14px; border: 1px solid;
              display: flex; align-items: center; gap: 16px; }
   .verdict.v-bad { background: var(--bad-bg); border-color: var(--bad-line); }
   .verdict.v-ok  { background: var(--ok-bg);  border-color: var(--ok-line); }
@@ -88,7 +205,7 @@
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 14px; }
   .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px;
          box-shadow: var(--shadow); }
-  .kpi b { display: block; font-size: 28px; font-weight: 800; line-height: 1.15; }
+  .kpi b { display: block; font-size: 26px; font-weight: 800; line-height: 1.15; }
   .kpi span { font-size: 12px; color: var(--muted); font-weight: 600; }
   .kpi.k-ok b { color: var(--ok); } .kpi.k-bad b { color: var(--bad); } .kpi.k-na b { color: var(--na); }
 
@@ -126,44 +243,138 @@
   h2 { font-size: 14px; margin: 0 0 4px; }
   .empty { color: var(--muted); text-align: center; padding: 26px; font-size: 13.5px; }
   .legend { font-size: 12px; color: var(--muted); margin: -4px 0 12px; display: flex; gap: 16px; flex-wrap: wrap; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 820px) {
+    .sidebar { position: fixed; z-index: 50; height: 100dvh; box-shadow: var(--shadow-lg); }
+    body:not(.sb-collapsed) .backdrop { opacity: 1; pointer-events: auto; }
+    .chips { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="brand">
-      <div class="logo">E</div>
-      <div>
-        <h1>EISVO LLM OCR</h1>
-      </div>
+<div class="app">
+  <!-- ================= Sidebar ================= -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-head">
+      <div class="brand"><div class="logo">E</div><span>EISVO&nbsp;AI</span></div>
     </div>
-    <button class="theme-btn" id="theme" title="Mavzuni almashtirish">◐</button>
-  </header>
-  <div class="sub">Shartnoma PDF'idan ma'lumot ajratish va EISVO API JSON'i bilan taqqoslash</div>
+    <div class="sb-scroll">
+      <button class="nav-item nav-new" onclick="showView('chat')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Yangi suhbat
+      </button>
 
-  <div class="card">
-    <div class="row">
-      <div class="field">
-        <label>Shartnoma PDF *</label>
-        <input type="file" id="pdf" accept=".pdf">
-      </div>
-      <div class="field">
-        <label>Shartnoma ID (server EISVO API'ga ulansa)</label>
-        <input type="text" id="contractId" placeholder="masalan: ZAP-0312" autocomplete="off">
-      </div>
-      <div class="field">
-        <label>yoki EISVO API JSON fayli</label>
-        <input type="file" id="apijson" accept=".json,application/json">
-      </div>
-      <div><button class="primary" id="run">Tekshirish</button></div>
+      <div class="sb-section">Bo'limlar</div>
+      <button class="nav-item active" id="nav-chat" onclick="showView('chat')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        AI yordamchi
+      </button>
+      <button class="nav-item" id="nav-ocr" onclick="showView('ocr')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg>
+        Shartnoma tekshiruvi
+      </button>
+
+      <div class="sb-section">So'nggi</div>
+      <button class="nav-item" onclick="showView('chat')" style="color:var(--muted)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        Hozircha suhbat yo'q
+      </button>
     </div>
-    <div class="health" id="health">Serverlar holati tekshirilyapti…</div>
+    <div class="sb-foot">
+      <div class="sb-user"><span class="ava">BR</span><span>Biznesni Rivojlantirish Banki</span></div>
+      <button class="icon-btn" id="theme" title="Mavzuni almashtirish">◐</button>
+    </div>
+  </aside>
+  <div class="backdrop" onclick="toggleSidebar()"></div>
+
+  <!-- ================= Main ================= -->
+  <div class="main">
+    <div class="topbar">
+      <button class="burger" id="burger" onclick="toggleSidebar()" title="Menyu" aria-label="Menyu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="top-title" id="top-title">AI yordamchi <small></small></div>
+      <div class="top-spacer"></div>
+    </div>
+
+    <!-- ---------- CHAT VIEW ---------- -->
+    <section class="view active" id="view-chat">
+      <div class="chat-scroll" id="chat-scroll">
+        <div class="greet" id="greet">
+          <div class="glogo">E</div>
+          <h2>Assalomu alaykum 👋</h2>
+          <p>EISVO AI — savdo shartnomalari bo'yicha yordamchingiz.<br>Nimadan boshlaymiz?</p>
+          <div class="chips">
+            <div class="chip" onclick="showView('ocr')">
+              <b>📄 Shartnomani tekshirish</b>
+              <span>PDF yuklab, EISVO API bilan solishtiring</span>
+            </div>
+            <div class="chip" onclick="askChip('Import va eksport shartnomasining farqi nimada?')">
+              <b>❓ Import / eksport farqi</b>
+              <span>Shartnoma turi qanday aniqlanadi?</span>
+            </div>
+            <div class="chip" onclick="askChip('Incoterms shartlari nimani anglatadi?')">
+              <b>🚚 Incoterms shartlari</b>
+              <span>EXW, FCA, CIP, DDP va boshqalar</span>
+            </div>
+            <div class="chip" onclick="askChip('O\'lchov birligi kodlari (OKEI) haqida ayting')">
+              <b>📦 O'lchov birliklari</b>
+              <span>796 (dona), kg, tonna kodlari</span>
+            </div>
+          </div>
+        </div>
+        <div class="chat-inner" id="chat-list" style="display:none"></div>
+      </div>
+      <div class="composer">
+        <div class="composer-inner">
+          <div class="input-wrap">
+            <textarea id="chat-input" rows="1" placeholder="Xabar yozing…"></textarea>
+            <button class="send" id="chat-send" title="Yuborish" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            </button>
+          </div>
+          <div class="composer-note">Chatbot demo rejimida — hozircha faqat interfeys. Shartnoma tekshiruvi to'liq ishlaydi.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- OCR VIEW (mavjud loyiha) ---------- -->
+    <section class="view" id="view-ocr">
+      <div class="ocr-scroll">
+        <div class="wrap">
+          <div class="page-head">
+            <h1>Shartnoma tekshiruvi</h1>
+            <div class="sub">Shartnoma PDF'idan ma'lumot ajratish va EISVO API JSON'i bilan taqqoslash</div>
+          </div>
+
+          <div class="card">
+            <div class="row">
+              <div class="field">
+                <label>Shartnoma PDF *</label>
+                <input type="file" id="pdf" accept=".pdf">
+              </div>
+              <div class="field">
+                <label>Shartnoma ID (server EISVO API'ga ulansa)</label>
+                <input type="text" id="contractId" placeholder="masalan: ZAP-0312" autocomplete="off">
+              </div>
+              <div class="field">
+                <label>yoki EISVO API JSON fayli</label>
+                <input type="file" id="apijson" accept=".json,application/json">
+              </div>
+              <div><button class="primary" id="run">Tekshirish</button></div>
+            </div>
+            <div class="health" id="health">Serverlar holati tekshirilyapti…</div>
+          </div>
+
+          <div class="err" id="err"></div>
+          <div class="spinner" id="spin"></div>
+          <div id="status-msg"></div>
+          <div id="results"></div>
+        </div>
+      </div>
+    </section>
   </div>
-
-  <div class="err" id="err"></div>
-  <div class="spinner" id="spin"></div>
-  <div id="status-msg"></div>
-  <div id="results"></div>
 </div>
 
 <script>
@@ -171,7 +382,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const val = (v) => (v === null || v === undefined || v === "") ? '<span>—</span>' : esc(v);
 
-/* ---- mavzu (light/dark) almashtirish ---- */
+/* ---- mavzu (light/dark) ---- */
 (function () {
   const saved = localStorage.getItem("eisvo-theme");
   if (saved) document.documentElement.setAttribute("data-theme", saved);
@@ -184,10 +395,95 @@ const val = (v) => (v === null || v === undefined || v === "") ? '<span>—</spa
   };
 })();
 
-/* ---- taqqoslash holati -> 3 ta savat ----
-   match      -> Moslik      (ikkalasida bor va mos)
-   mismatch   -> Nomoslik    (ikkalasida bor, farqli; YOKI API'da bor, model topmagan)
-   topilmadi  -> Topilmadi   (model topdi, API'da yo'q; YOKI ikkalasida ham yo'q; noma'lum kod) */
+/* ---- Sidebar ochish/yopish ---- */
+function isMobile() { return matchMedia("(max-width: 820px)").matches; }
+// desktopda ochiq, mobil'da yopiq boshlansin
+if (isMobile()) document.body.classList.add("sb-collapsed");
+function toggleSidebar() { document.body.classList.toggle("sb-collapsed"); }
+
+/* ---- Ko'rinishlar (chat <-> ocr) ---- */
+const VIEW_TITLES = { chat: ["AI yordamchi", ""], ocr: ["Shartnoma tekshiruvi", "PDF ↔ EISVO API"] };
+function showView(name) {
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
+  $("nav-chat").classList.toggle("active", name === "chat");
+  $("nav-ocr").classList.toggle("active", name === "ocr");
+  const [t, s] = VIEW_TITLES[name] || ["", ""];
+  $("top-title").innerHTML = esc(t) + (s ? ` <small>${esc(s)}</small>` : "");
+  if (isMobile()) document.body.classList.add("sb-collapsed");   // mobil'da tanlagach yopiladi
+  if (name === "chat") setTimeout(() => $("chat-input").focus(), 50);
+}
+
+/* =======================================================
+   CHATBOT (demo — frontend only, backendga ulanmagan)
+   ======================================================= */
+const chatInput = $("chat-input"), chatSend = $("chat-send"), chatList = $("chat-list");
+let chatBusy = false;
+
+chatInput.addEventListener("input", () => {
+  chatInput.style.height = "auto";
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 180) + "px";
+  chatSend.disabled = !chatInput.value.trim() || chatBusy;
+});
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+});
+chatSend.onclick = sendChat;
+
+function addMsg(role, html) {
+  $("greet").style.display = "none";
+  chatList.style.display = "block";
+  const el = document.createElement("div");
+  el.className = "msg " + (role === "me" ? "me" : "ai");
+  el.innerHTML = `
+    <div class="ava">${role === "me" ? "S" : "E"}</div>
+    <div class="body">
+      <div class="who">${role === "me" ? "Siz" : "EISVO AI"}</div>
+      <div class="bubble">${html}</div>
+    </div>`;
+  chatList.appendChild(el);
+  $("chat-scroll").scrollTop = $("chat-scroll").scrollHeight;
+  return el;
+}
+
+function askChip(text) { chatInput.value = text; chatInput.dispatchEvent(new Event("input")); sendChat(); }
+
+function sendChat() {
+  const text = chatInput.value.trim();
+  if (!text || chatBusy) return;
+  addMsg("me", esc(text));
+  chatInput.value = ""; chatInput.style.height = "auto"; chatSend.disabled = true; chatBusy = true;
+
+  // "yozmoqda" indikatori
+  const typing = addMsg("ai", `<span class="typing"><i></i><i></i><i></i></span>`);
+  setTimeout(() => {
+    typing.querySelector(".bubble").innerHTML = demoReply(text);
+    $("chat-scroll").scrollTop = $("chat-scroll").scrollHeight;
+    chatBusy = false; chatSend.disabled = !chatInput.value.trim();
+  }, 650 + Math.random() * 500);
+}
+
+/* Backend ulanmagunча ishlaydigan oddiy demo-javob. */
+function demoReply(q) {
+  const t = q.toLowerCase();
+  if (t.includes("incoterms"))
+    return "Incoterms — xalqaro yetkazib berish shartlari (EXW, FCA, FOB, CIP, DDP...). "
+      + "Har biri xarajat va javobgarlik chegarasini belgilaydi. EISVO ularni kod bilan saqlaydi "
+      + "(mas. CIP=08). To'liq solishtiruvni <b>Shartnoma tekshiruvi</b> bo'limida ko'rasiz.";
+  if (t.includes("import") || t.includes("eksport") || t.includes("export"))
+    return "Shartnoma turi O'zbek tomonning roliga qarab aniqlanadi: O'zbek tomon <b>sotuvchi</b> bo'lsa — "
+      + "<b>eksport</b> (API cntrType 01), <b>xaridor</b> bo'lsa — <b>import</b> (cntrType 02). "
+      + "Buni PDF va API o'rtasida solishtirish uchun <b>Shartnoma tekshiruvi</b> bo'limiga o'ting.";
+  if (t.includes("birlik") || t.includes("okei") || t.includes("796"))
+    return "O'lchov birliklari OKEI kodlari bilan yuritiladi: 796 — dona/штука (комплект, набор, set ham), "
+      + "166 — kg, 168 — tonna, 006 — metr. Model PDF'dagi birlikni shu kodlarga bog'lab API bilan solishtiradi.";
+  return "Bu chatbot hozircha <b>demo rejimida</b> — backend hali ulanmagan, shuning uchun javoblar cheklangan. "
+      + "Tayyor va to'liq ishlaydigan qism — <b>Shartnoma tekshiruvi</b>: chapdagi menyudan o'ting yoki "
+      + "<a href=\"#\" onclick=\"showView('ocr');return false\" style=\"color:var(--accent)\">shu yerni bosing</a>.";
+}
+
+/* =======================================================
+   SHARTNOMA TEKSHIRUVI (mavjud mantiq — o'zgarmagan)
+   ======================================================= */
 function bucketOf(status) {
   if (status === "match") return "match";
   if (status === "mismatch") return "mismatch";
@@ -196,8 +492,8 @@ function bucketOf(status) {
 const BADGES = {
   match:        ["b-match",    "✓", "MOSLIK"],
   mismatch:     ["b-mismatch", "✗", "NOMOSLIK"],
-  missing_api:  ["b-na",       "○", "API'DA YO'Q"],      // model topdi, API'da yo'q
-  missing_pdf:  ["b-na",       "○", "IKKALASIDA YO'Q"],  // ikkalasida ham yo'q
+  missing_api:  ["b-na",       "○", "API'DA YO'Q"],
+  missing_pdf:  ["b-na",       "○", "IKKALASIDA YO'Q"],
   unknown_code: ["b-unknown",  "?", "NOMA'LUM KOD"],
   high:         ["b-high",     "✓", "OCR HIGH"],
   low:          ["b-low",      "!", "OCR LOW"],
@@ -254,8 +550,8 @@ $("run").onclick = async () => {
   const fd = new FormData();
   fd.append("pdf", pdf);
   const cid = $("contractId").value.trim();
-  if (cid) fd.append("contract_id", cid);          // 1-ustuvor: server API'ga ID bilan
-  else if ($("apijson").files[0]) fd.append("api_json", $("apijson").files[0]);  // yoki JSON fayl
+  if (cid) fd.append("contract_id", cid);
+  else if ($("apijson").files[0]) fd.append("api_json", $("apijson").files[0]);
 
   $("err").style.display = "none"; $("results").innerHTML = "";
   $("spin").style.display = "block"; $("run").disabled = true;
@@ -271,9 +567,6 @@ $("run").onclick = async () => {
   }
 };
 
-/* taqqoslash natijasini yagona qatorlar ro'yxatiga yig'ish (maydonlar + tovarlar).
-   Har qator {key, desc, pdf, api, status, ocr}. status compare.py'dan keladi va
-   bucketOf() bilan Moslik / Nomoslik / Topilmadi'ga ajratiladi. */
 function buildRows(d) {
   const rows = [];
   for (const [k, f] of Object.entries(d.comparison.fields)) {
@@ -284,7 +577,6 @@ function buildRows(d) {
   p.rows.forEach((r, i) => {
     const nm = r.pdf?.name ? ` (${r.pdf.name})` : "";
     if (!r.api) {
-      // model tovarni topdi, lekin API'da bunday tovar yo'q -> Topilmadi
       rows.push({ key: `products[${i}]`, desc: `Tovar ${i + 1}${nm} — model topdi, APIda yo'q`,
                   pdf: r.pdf?.name, api: null, status: "missing_api" });
       return;
@@ -298,7 +590,6 @@ function buildRows(d) {
     }
   });
   p.unmatched_api.forEach((g, i) => {
-    // API'da bor, model PDF'dan topolmagan tovar -> Nomoslik
     rows.push({ key: `api_goods[${i}]`, desc: `APIdagi tovar — model PDFda topolmadi`,
                 pdf: null, api: g.itemsName, status: "mismatch" });
   });
@@ -402,7 +693,6 @@ function render(d) {
       <div class="kpi k-na"><b>${v.na ?? 0}</b><span>Topilmadi</span></div>
     </div>`;
 
-    // taqqoslashsiz rejimda OCR/Validator ogohlantirishlari alohida ko'rsatiladi
     const vf = d.validation?.fields || {};
     const bad = Object.entries(vf).filter(([, f]) => f.confidence === "low" || f.confidence === "failed");
     if (bad.length) {

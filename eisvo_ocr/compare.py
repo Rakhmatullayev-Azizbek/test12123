@@ -70,9 +70,8 @@ _EXTRA_SPECS: list[tuple[str, str, str]] = [
     ("manufacturer.inn", "manufacturers.0.inn", "id"),
     ("specification_number", "specifications.0.docNo", "id"),
     ("payment_deadline", "importTerms.0.paymentDeadline", "id"),
-    # payment_currency ATAYLAB yo'q: API accCurrCode1 doim bor va odatda shartnoma
-    # valyutasi bilan bir xil — solishtirilsa soxta mismatch beradi (currency allaqachon
-    # currCode1 bilan tekshiriladi). Maydon ajratiladi-yu, taqqoslanmaydi.
+    # payment_currency (accCurrCode1) bu yerda EMAS — u `_compare_fields`da alohida
+    # qo'shiladi, chunki PDF'da bo'sh bo'lsa shartnoma valyutasidan (currency) fallback oladi.
 ]
 
 
@@ -382,9 +381,7 @@ def _bank_attributes_row(extracted: dict, contract: dict, for_side: str) -> dict
     }
 
 
-def _compare_one(extracted: dict, contract: dict, our_path: str, api_path: str, kind: str) -> dict:
-    ours = _get_path(extracted, our_path)
-    theirs = _get_path(contract, api_path)
+def _compare_value(ours: Any, theirs: Any, api_path: str, kind: str) -> dict:
     ours_empty = ours is None or (isinstance(ours, str) and not ours.strip())
     theirs_empty = theirs is None or (isinstance(theirs, str) and not theirs.strip())
     if theirs_empty:
@@ -398,6 +395,12 @@ def _compare_one(extracted: dict, contract: dict, our_path: str, api_path: str, 
     return {"pdf": ours, "api": theirs, "api_field": api_path, "status": status, "score": score}
 
 
+def _compare_one(extracted: dict, contract: dict, our_path: str, api_path: str, kind: str) -> dict:
+    return _compare_value(
+        _get_path(extracted, our_path), _get_path(contract, api_path), api_path, kind
+    )
+
+
 def _compare_fields(extracted: dict, contract: dict, orientation: str) -> dict[str, dict]:
     for_side, uz_side = ("seller", "buyer") if orientation == "import" else ("buyer", "seller")
     out: dict[str, dict] = {}
@@ -407,6 +410,14 @@ def _compare_fields(extracted: dict, contract: dict, orientation: str) -> dict[s
         entry["_tpl"] = our_tpl
         out[our_path] = entry
     out[f"{for_side}.bank.attributes"] = _bank_attributes_row(extracted, contract, for_side)
+    # To'lov valyutasi (API accCurrCode1). PDF'da alohida ko'rsatilmasa — shartnoma
+    # valyutasi (currency) ishlatiladi (odatda to'lov shartnoma valyutasida amalga oshiriladi).
+    pay = _get_path(extracted, "payment_currency")
+    if pay is None or (isinstance(pay, str) and not pay.strip()):
+        pay = _get_path(extracted, "currency")
+    pc = _compare_value(pay, contract.get("accCurrCode1"), "accCurrCode1", "currency")
+    pc["_tpl"] = "payment_currency"
+    out["payment_currency"] = pc
     # Грузополучатель / Consignee — yo'nalishdan mustaqil, faqat mos shartnoma turlarida
     if str(contract.get("cntrType") or "").strip().zfill(2) not in _NO_RECEIVER_TYPES:
         for our_path, api_path, kind in _RECEIVER_SPECS:

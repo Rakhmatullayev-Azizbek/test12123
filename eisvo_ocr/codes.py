@@ -89,8 +89,13 @@ UNIT_CODE2NAMES: dict[str, list[str]] = {
             # bo'lsa model shuni chiqaradi) — 796 bilan mos deb qabul qilamiz
             "комплект", "комплекты", "komplekt", "набор", "наборы", "nabor",
             "кассета", "кассеты", "kasseta", "set", "sets"],
-    "166": ["кг", "кг.", "kg", "килограмм", "kilogramm"],
-    "168": ["т", "тонна", "tonna", "ton", "mt"],
+    # EISVO og'irlik birliklarini ko'pincha 166 bilan kodlaydi — kilogramm ham,
+    # tonna ham (masalan qadoqlash materiallari тонна hisobida). Shu bois тонна
+    # variantlari 166 ro'yxatiga ham qo'shildi (168 ham saqlanadi — ba'zi shartnomalar
+    # тоннани 168 bilan kodlaydi). unit_matches API kodiga qarab qidiradi.
+    "166": ["кг", "кг.", "kg", "килограмм", "kilogramm",
+            "т", "т.", "тн", "тонна", "тонн", "tonna", "tonn", "ton", "mt"],
+    "168": ["т", "т.", "тн", "тонна", "тонн", "tonna", "tonn", "ton", "mt"],
     "006": ["м", "метр", "metr", "m"],
     "055": ["м2", "кв.м", "kv.m", "m2"],
     "113": ["м3", "куб.м", "kub.m", "m3"],
