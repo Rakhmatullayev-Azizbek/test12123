@@ -17,8 +17,9 @@ import tempfile
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import eisvo_client
@@ -29,6 +30,39 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("eisvo_ocr.server")
 
 app = FastAPI(title="EISVO LLM OCR", version="0.1.0")
+
+# CORS — backend FAQAT quyidagi manbalarga javob beradi: Vercel'dagi frontend va
+# lokal UI (localhost:8080). Boshqa sayt/origin bloklanadi. Ro'yxatni
+# WEB_ALLOWED_ORIGINS (vergul bilan) orqali o'zgartirish mumkin.
+_DEFAULT_ORIGINS = (
+    "https://chat-zeta-sepia-25.vercel.app,"
+    "http://localhost:8080,http://127.0.0.1:8080"
+)
+_ALLOWED_ORIGINS = [
+    o.strip().rstrip("/")
+    for o in os.environ.get("WEB_ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",")
+    if o.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Origin darajasida majburlash: CORS faqat brauzerni cheklaydi (javob sarlavhasi),
+# server esa baribir javob beradi. Bu middleware ruxsat etilmagan origin'li
+# so'rovlarni (boshqa sayt/API) 403 bilan RAD etadi. Origin sarlavhasi YO'Q
+# so'rovlar (sahifani to'g'ridan ochish, ichki health-check) o'tadi.
+@app.middleware("http")
+async def _restrict_origin(request: Request, call_next):
+    origin = request.headers.get("origin")
+    if origin and origin.rstrip("/") not in _ALLOWED_ORIGINS:
+        return JSONResponse(status_code=403, content={"detail": "Ruxsat etilmagan manba (origin)."})
+    return await call_next(request)
+
 _STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 
@@ -59,6 +93,77 @@ def health():
 def api_config():
     """Frontend uchun: EISVO API ID-rejimi sozlanganmi (URL bor-yo'qligi)."""
     return {"api_lookup": bool(settings.eisvo_api_url.strip())}
+
+
+# ── AI Chatbot (RAG) proksi ─────────────────────────────────────────────────
+# Brauzer «AI Chatbot» bo'limidan /api/chat ga so'rov yuboradi (bir xil origin,
+# 8080). Bu yerdan docker tarmog'idagi rag_backend'ga (8008) uzatiladi — shunda
+# CORS/cookie muammosi bo'lmaydi va 8008 tashqariga ochiq bo'lishi shart emas.
+CHAT_BACKEND_URL = os.environ.get("CHAT_BACKEND_URL", "http://rag_backend:8008").rstrip("/")
+_CHAT_COOKIE = "tr_chatbot_uid"
+
+
+@app.get("/api/chat/health")
+async def api_chat_health():
+    """Chatbot backend tayyorligi (web frontend indikatori uchun)."""
+    try:
+        async with httpx.AsyncClient(timeout=4) as client:
+            r = await client.get(f"{CHAT_BACKEND_URL}/health")
+        return {"reachable": r.status_code == 200, **(r.json() if r.headers.get(
+            "content-type", "").startswith("application/json") else {})}
+    except Exception:
+        return {"reachable": False}
+
+
+@app.get("/api/chat/stats")
+async def api_chat_stats():
+    """Admin panel uchun: indekslash statistikasi (rag_backend /stats proksi)."""
+    try:
+        async with httpx.AsyncClient(timeout=6) as client:
+            r = await client.get(f"{CHAT_BACKEND_URL}/stats")
+        return JSONResponse(status_code=r.status_code, content=r.json())
+    except Exception as e:
+        return JSONResponse(status_code=502, content={"detail": f"stats olinmadi: {e}"})
+
+
+@app.post("/api/chat")
+async def api_chat(request: Request):
+    """Savolni rag_backend'ga uzatadi va sessiya cookie'sini ikki tomonlama olib o'tadi."""
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(400, "JSON body kutilyapti (masalan {\"question\": \"...\"})")
+
+    fwd_cookies = {}
+    if (c := request.cookies.get(_CHAT_COOKIE)):
+        fwd_cookies[_CHAT_COOKIE] = c
+
+    # Cross-origin (Vercel↔tunnel) cookie ishlamasligi mumkin — frontend barqaror
+    # X-Session-Id yuboradi; uni rag_backend'ga o'tkazamiz (tarix shu bilan bog'lanadi).
+    fwd_headers = {}
+    if (sid := request.headers.get("x-session-id")):
+        fwd_headers["X-Session-Id"] = sid
+
+    try:
+        async with httpx.AsyncClient(timeout=180) as client:
+            r = await client.post(
+                f"{CHAT_BACKEND_URL}/chat", json=payload,
+                cookies=fwd_cookies, headers=fwd_headers,
+            )
+    except httpx.HTTPError as e:
+        raise HTTPException(502, f"Chatbot backendga ulanib bo'lmadi: {e}")
+
+    ctype = r.headers.get("content-type", "")
+    body = r.json() if ctype.startswith("application/json") else {"detail": r.text[:500]}
+    resp = JSONResponse(status_code=r.status_code, content=body)
+
+    # rag_backend bergan yangi sessiya cookie'sini brauzerga (8080 origin) o'tkazamiz
+    if (new_cookie := r.cookies.get(_CHAT_COOKIE)):
+        resp.set_cookie(
+            _CHAT_COOKIE, new_cookie,
+            max_age=365 * 24 * 3600, httponly=True, samesite="lax",
+        )
+    return resp
 
 
 @app.post("/api/process")

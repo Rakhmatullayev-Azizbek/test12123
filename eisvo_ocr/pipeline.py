@@ -7,7 +7,7 @@ from pathlib import Path
 
 from . import assembler, deterministic, llm_layer, pdf_utils, validator
 from .codes import country_matches
-from .compare import compare_contract_data
+from .compare import _cmp_text, compare_contract_data
 from .schemas import ExtractedContract
 
 log = logging.getLogger("eisvo_ocr")
@@ -122,13 +122,24 @@ def _reassign_uzbek_inn(meta) -> None:
             other.inn = inn
 
 
-def _fill_third_party_defaults(meta) -> None:
-    """Uchinchi shaxs (receiver/supplier/manufacturer) yorlig'i matnda topilmaganida
-    uning nom/mamlakat/INN'ini mos asosiy tomondan (buyer/seller) meros qilib olamiz.
+def _same_company(a, b) -> bool:
+    """Ikki nom bir tashkilotni bildiradimi (translit + legal-form + fuzzy)."""
+    if not (a and str(a).strip() and b and str(b).strip()):
+        return False
+    status, _ = _cmp_text(a, b)
+    return status == "match"
 
-    Faqat uchinchi shaxs YORLIQSIZ — ya'ni name ham, inn ham bo'sh — bo'lsa ishlaydi;
-    aniq yorliqlangan tomon (masalan PDF'da alohida Грузоотправитель ko'rsatilgan)
-    ustidan YOZMAYMIZ, chunki u asosiy tomondan farq qilishi mumkin.
+
+def _fill_third_party_defaults(meta) -> None:
+    """Uchinchi shaxs (receiver/supplier/manufacturer) INN/nom/mamlakatini mos asosiy
+    tomondan (buyer/seller) meros qilib olamiz. Ikki holat:
+
+    1) Uchinchi shaxs UMUMAN yorliqsiz (na nom, na INN) — matnda topilmagan; nom,
+       mamlakat va INN'ni to'liq meros olamiz.
+    2) Nom BOR, lekin INN yo'q — ko'p shartnomada Грузополучатель buyer bilan bir xil
+       nom bilan yozilib, INN takrorlanmaydi. Nom asosiy tomon bilan mos kelsa,
+       INN'ni o'shandan to'ldiramiz (EISVO ham consignee.inn'ni buyer'dan avto-oladi).
+       Nom farq qilsa — boshqa tashkilot, INN'ni KO'CHIRMAYMIZ.
     """
     for tp_name, main_name in _THIRD_PARTY_INN_FALLBACK.items():
         tp = getattr(meta, tp_name, None)
@@ -137,15 +148,21 @@ def _fill_third_party_defaults(meta) -> None:
             continue
         has_name = bool(tp.name and tp.name.strip())
         has_inn = bool(tp.inn and tp.inn.strip())
-        if has_name or has_inn:
+        main_inn = (main.inn or "").strip()
+        if has_inn:
             continue
-        if main.name and main.name.strip():
-            tp.name = main.name.strip()
-        main_country = getattr(main, "country", None)
-        if main_country and str(main_country).strip():
-            tp.country = main_country
-        if main.inn and main.inn.strip():
-            tp.inn = main.inn.strip()
+        if not has_name:
+            # Holat 1: to'liq yorliqsiz — nom/mamlakat/INN'ni meros olamiz
+            if main.name and main.name.strip():
+                tp.name = main.name.strip()
+            main_country = getattr(main, "country", None)
+            if main_country and str(main_country).strip():
+                tp.country = main_country
+            if main_inn:
+                tp.inn = main_inn
+        elif main_inn and _same_company(tp.name, main.name):
+            # Holat 2: nom bor, INN yo'q, nom asosiy tomon bilan bir xil — INN'ni olamiz
+            tp.inn = main_inn
 
 
 def _flatten_extracted(extracted: dict) -> dict:

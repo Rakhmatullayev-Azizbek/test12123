@@ -68,6 +68,11 @@ services:
     environment:
       - EISVO_VLLM_BASE_URL=http://vllm:8000/v1
       - SURYA_INFERENCE_URL=http://surya:8000/v1
+      # AI Chatbot (RAG) — web'dagi «AI Chatbot» bo'limi shu backend'ga proksi qiladi
+      - CHAT_BACKEND_URL=http://rag_backend:8008
+      # Backend FAQAT shu manbalarga javob beradi (Vercel frontend + lokal UI).
+      # Vercel domeni o'zgarsa shu yerni yangilang.
+      - WEB_ALLOWED_ORIGINS=${WEB_ALLOWED_ORIGINS:-https://chat-zeta-sepia-25.vercel.app,http://localhost:8080,http://127.0.0.1:8080}
       # EISVO API (ID orqali shartnoma olish) — qiymatlar host .env'dan olinadi
       - EISVO_API_URL=${EISVO_API_URL:-}
       - EISVO_API_TOKEN=${EISVO_API_TOKEN:-}
@@ -97,5 +102,105 @@ services:
         condition: service_started
     profiles: ["run"]         # faqat qo'lda ishga tushiriladi
 
+  # ══════════════════════════════════════════════════════════════════════════
+  #  AI CHATBOT (lex.uz qonunchilik RAG) — tr_chatbot repodan birlashtirildi.
+  #  LLM sifatida yuqoridagi `vllm` (Qwen3-14B-AWQ, :8000) ishlatiladi — alohida
+  #  gemma/8050 server EMAS. Embeddinglar CPU'da (GPU vllm+surya bilan band).
+  #  Portlar: rag_backend 8008, qdrant 6565, postgres 5433 — mavjud
+  #  8000/8001/8080 bilan to'qnashmaydi.
+  # ══════════════════════════════════════════════════════════════════════════
+
+  # Sessiya va suhbat tarixi (chatbot)
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tr_chatbot}
+      POSTGRES_USER: ${POSTGRES_USER:-tr_chatbot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD .env faylida ko'rsatilishi shart}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tr_chatbot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Vektor bazasi (indekslangan qonunchilik bandlari)
+  qdrant:
+    image: qdrant/qdrant:v1.11.0
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6565
+    ports:
+      - "${QDRANT_PORT:-6565}:6565"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/localhost/6565' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # lex.uz hujjatlarini yuklab olish (document_urls.txt asosida) -> data/raw
+  scraper:
+    build:
+      context: .
+      dockerfile: scraper/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./scraper/document_urls.txt:/app/document_urls.txt:ro
+
+  # HTML -> chunk -> multilingual-e5-large (CPU) -> Qdrant upsert
+  indexer:
+    build:
+      context: .
+      dockerfile: indexer/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      # 2.2 GB embedding modeli konteyner qayta yaratilganda qaytadan yuklanmasin
+      - chatbot_hf_cache:/app/hf_cache
+
+  # RAG API (FastAPI :8008) — savolni vektorlab Qdrant'dan topadi, Qwen'ga beradi
+  rag_backend:
+    build:
+      context: .
+      dockerfile: rag_backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      vllm:
+        condition: service_started
+    env_file: .env
+    ports:
+      - "${BACKEND_PORT:-8008}:8008"
+    volumes:
+      # /stats endpointi metadata.db dan hujjat sonini o'qiydi
+      - ./data:/app/data
+      - chatbot_hf_cache:/app/hf_cache
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8008/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
 volumes:
   hf-cache:
+  qdrant_storage:
+  postgres_data:
+  chatbot_hf_cache:

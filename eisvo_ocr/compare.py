@@ -109,6 +109,9 @@ _LEGAL_FORMS = {
     "masuliyati", "cheklangan", "ogranichennoy", "otvetstvennostyu",
     # «Aksiyadorlik Jamiyati» (AJ), ochiq/yopiq turlari
     "aksiyadorlik", "ochiq", "yopiq",
+    # «Fermer Xo'jaligi» = «Фермерское Хозяйство» = «FX»/«ФХ» (x->h fold'dan keyin «fh»):
+    # «ФЕРМЕРСКОЕ ХОЗЯЙСТВО КУЧКОР» == «KUCHKOR FX» -> ikkalasi «kuchkor»
+    "fermer", "fermerskoe", "hojaligi", "hozyaystvo", "fh",
 }
 
 # kirill homoglif harflari (lotinga vizual mos) — ID'larda: «НАН» (kirill) == «HAH» (lotin).
@@ -229,6 +232,12 @@ def _cmp_text(ours: Any, theirs: Any) -> tuple[str, float]:
     # qisqaroq — «...Hususiy Korxonasi» vs «...XK», «г.Ашхабад, Туркменистан» vs «г.Ашхабад»)
     # token_sort past baho beradi, token_set esa to'g'ri.
     score = max(fuzz.token_sort_ratio(a, b), fuzz.token_set_ratio(a, b)) / 100
+    # OCR/model nomni ba'zan bo'lib yoki qo'shib yuboradi («Волга Текс»↔«ВолгаТекс»);
+    # bo'shliqsiz variantni ham solishtiramiz. Faqat skorni OSHIRADI — ikki HAR XIL nom
+    # (mas. «XORAZM TEX»↔«XAMKOR-TEKS») bo'shliqsiz ham past qoladi.
+    a2, b2 = a.replace(" ", ""), b.replace(" ", "")
+    if a2 and b2:
+        score = max(score, fuzz.ratio(a2, b2) / 100)
     ok = score >= settings.compare_fuzzy_threshold
     return ("match" if ok else "mismatch"), round(score, 3)
 
@@ -242,7 +251,8 @@ _ADDR_GENERIC = {
     "respublika", "respublikasi", "respubliki", "dom", "uyi", "ulitsa",
     "kocha", "kochasi", "mahalla", "mahallasi", "mfy", "mfj", "territoriya",
     "territoriyasi", "dvor", "street", "building", "poselok", "qishloq",
-    "kishlak", "aholi", "punkti", "obl", "prospekt", "proezd",
+    "kishlak", "qishlogi", "kishlogi", "qishlog", "kishlog", "mahallya",
+    "aholi", "punkti", "obl", "prospekt", "proezd",
     # ma'muriy/tavsif so'zlari (en/uz/ru) — proper ot emas, solishtirishda tashlanadi.
     # «Free Economic Zone» == «erkin iqtisodiy zonasi», «Massif» == «massivi»
     "region", "district", "city", "town", "village", "area", "zone", "zona",
@@ -279,7 +289,16 @@ def _toponym_root(tok: str) -> str:
         if t.endswith(suf) and len(t) - len(suf) >= 4:
             t = t[: -len(suf)]
             break
-    t = _PLACE_CANON.get(t, t)   # gazetteer kanoni AVVAL
+    canon = _PLACE_CANON.get(t)   # gazetteer kanoni AVVAL
+    if canon is None and len(t) >= 4:
+        # sifat qo'shimchasi kesilgach o'zak to'liq kanon kalit bo'lmasligi mumkin
+        # («Бухарская»->«buharskaya»->«buhar»); o'zak biror kanon kalitning PREFIKSI
+        # bo'lsa, o'sha kanonga ulaymiz (buhar->buhara->Buxoro). Bir nechta HAR XIL
+        # kanonga teginsa noaniq — ulamaymiz.
+        prefixed = {c for k, c in _PLACE_CANON.items() if k.startswith(t)}
+        if len(prefixed) == 1:
+            canon = next(iter(prefixed))
+    t = canon if canon is not None else t
     return t.replace("q", "k")   # q->k OXIRIDA (Qarshi==Karshi, Qashqadaryo==Kashkadaryo)
 
 
@@ -288,10 +307,15 @@ _VOWELS = frozenset("aeiou")
 
 def _root_match(a: str, b: str) -> bool:
     """Ikki toponim o'zagi mosmi: fuzzy partial_ratio YOKI undosh-skelet tengligi.
-    Skelet unli farqlarini yutadi: «yashnobod»(uz)↔«yashnabad»(ru) -> «yshnbd»==«yshnbd»."""
+    Skelet unli farqlarini yutadi: «yashnobod»(uz)↔«yashnabad»(ru) -> «yshnbd»==«yshnbd».
+
+    partial_ratio substring mosligini UZUNLIK NISBATI bilan cheklaymiz: kichik o'zak
+    katta (odatda OCR yopishtirgan) o'zak ichida yutilib ketmasin — «fergan» «konizorfergan»
+    ichida bor deb MOS berilmaydi (6/13 < 0.6). To'g'ri variantlar (fargona↔fergan)
+    o'xshash uzunlikda bo'lgani uchun yoki undosh-skelet orqali baribir mos qoladi."""
     if not a or not b:
         return False
-    if fuzz.partial_ratio(a, b) >= 82:
+    if fuzz.partial_ratio(a, b) >= 82 and min(len(a), len(b)) / max(len(a), len(b)) >= 0.6:
         return True
     sa = "".join(c for c in a if c not in _VOWELS)
     sb = "".join(c for c in b if c not in _VOWELS)
@@ -303,17 +327,18 @@ def _cmp_address(ours: Any, theirs: Any) -> tuple[str, float]:
     (fuzzy) uchrasa match. Toshkent↔Ташкент, tuman↔район farqlari shunda yutiladi.
     Har tokendan toponim O'ZAGI olinadi (rus sifat qo'shimchasi kesiladi), shuning
     uchun «Сырдарьинская»↔«Sirdaryo», «Каршинский»↔«Qarshi» ham mos keladi."""
-    toks_a, toks_b = _addr_tokens(ours), _addr_tokens(theirs)
-    if not toks_a or not toks_b:
+    toks_pdf, toks_api = _addr_tokens(ours), _addr_tokens(theirs)
+    if not toks_pdf or not toks_api:
         return _cmp_text(ours, theirs)  # atoqli ot yo'q — oddiy matn solishtiruvi
-    roots_a = [_toponym_root(t) for t in toks_a]
-    roots_b = [_toponym_root(t) for t in toks_b]
-    # kamroq atoqli otga ega tomonni ikkinchisida qidiramiz (subset mantiqi):
-    # har bir o'zak ikkinchi tomon o'zaklaridan birortasiga mos kelsa — topildi
-    (short, long_roots) = (roots_b, roots_a) if len(roots_b) <= len(roots_a) \
-        else (roots_a, roots_b)
-    found = sum(1 for s in short if any(_root_match(s, l) for l in long_roots))
-    score = found / len(short)
+    roots_pdf = [_toponym_root(t) for t in toks_pdf]
+    roots_api = [_toponym_root(t) for t in toks_api]
+    # QAMROV (coverage): API'ning har bir toponimini PDF (model chiqishi) qamraganmi.
+    # Ya'ni model API'dagi ma'lumotni to'liq chiqarishi kerak; PDF qo'shimcha
+    # (ko'cha/uy) tokenlarga ega bo'lsa mayli — ular maxrajga kirmaydi. Shu bois
+    # API qisqaroq bo'lsa (mas. faqat viloyat/tuman) PDF uni qamrasa MOS; aksincha
+    # PDF juda kam bo'lsa (mas. faqat «China») API'ning katta qismi qoplanmay mismatch.
+    found = sum(1 for a in roots_api if any(_root_match(a, p) for p in roots_pdf))
+    score = found / len(roots_api)
     return ("match" if score >= 0.6 else "mismatch"), round(score, 3)
 
 
@@ -360,20 +385,29 @@ def _bank_attributes_row(extracted: dict, contract: dict, for_side: str) -> dict
         swift = str(bank.get("swift") or "").strip()
         account = str(bank.get("account") or "").strip()
     api_attrs = contract.get("bankForAttributes")
-    needed = [v for v in (swift, account) if v]
     pdf_display = "; ".join(
         p for p in (f"SWIFT: {swift}" if swift else "",
                     f"hisob: {account}" if account else "") if p
     )
-    if not needed:
+    if not (swift or account):
         status, score = "missing_pdf", 0.0
     elif not (api_attrs and str(api_attrs).strip()):
         status, score = "missing_api", 0.0
     else:
-        hay = re.sub(r"\s", "", str(api_attrs)).upper()
-        present = sum(1 for v in needed if re.sub(r"\s", "", v).upper() in hay)
-        status = "match" if present == len(needed) else "mismatch"
-        score = round(present / len(needed), 3)
+        # faqat harf-raqam qoldiramiz: bo'shliq, vergul, qavs, kirill «Счет/№» farqlari
+        # solishtirishga xalaqit bermasin (PDF hisoblarni VERGUL bilan, API bo'shliq/matn
+        # bilan ajratadi). Har bir HISOB raqamini ALOHIDA qidiramiz — shu bois hisoblar
+        # tartibi yoki ajratgichi farq qilsa ham to'g'ri topiladi.
+        hay = re.sub(r"[^0-9A-Z]", "", str(api_attrs).upper())
+        checks = []
+        if swift:
+            checks.append(re.sub(r"[^0-9A-Z]", "", swift.upper()))
+        accounts = re.findall(r"\d{8,}", account)  # bir yoki bir nechta hisob raqami
+        checks.extend(accounts or ([re.sub(r"[^0-9A-Z]", "", account.upper())] if account else []))
+        checks = [c for c in checks if c]
+        present = sum(1 for c in checks if c in hay)
+        status = "match" if checks and present == len(checks) else "mismatch"
+        score = round(present / len(checks), 3) if checks else 0.0
     return {
         "pdf": pdf_display or None, "api": api_attrs,
         "api_field": "bankForAttributes", "status": status, "score": score,

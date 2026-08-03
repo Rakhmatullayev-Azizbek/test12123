@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "eisvo_ocr/static/**", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/", "dest": "/eisvo_ocr/static/index.html" },
+    { "src": "/(.*)", "dest": "/eisvo_ocr/static/$1" }
+  ]
+}
