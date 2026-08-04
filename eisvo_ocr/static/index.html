@@ -481,7 +481,18 @@ const val = (v) => (v === null || v === undefined || v === "") ? '<span>—</spa
 const DEFAULT_TUNNEL = "https://comprehensive-beautiful-spectacular-kit.trycloudflare.com";
 const API_BASE = (function () {
   const qp = new URLSearchParams(location.search).get("api");
-  if (qp) localStorage.setItem("eisvo-api-base", qp.replace(/\/+$/, ""));
+  if (qp) {
+    const clean = qp.replace(/\/+$/, "");
+    localStorage.setItem("eisvo-api-base", clean);
+    localStorage.setItem("eisvo-api-default", DEFAULT_TUNNEL);
+    return clean;
+  }
+  /* Yangi deploy DEFAULT_TUNNEL'ni o'zgartirgan bo'lsa (tunnel qayta build qilingan),
+     brauzerdagi eski override o'lik backendga ishora qiladi — uni tashlaymiz. */
+  if (localStorage.getItem("eisvo-api-default") !== DEFAULT_TUNNEL) {
+    localStorage.removeItem("eisvo-api-base");
+    localStorage.setItem("eisvo-api-default", DEFAULT_TUNNEL);
+  }
   const ov = localStorage.getItem("eisvo-api-base");
   if (ov) return ov.replace(/\/+$/, "");
   const h = location.hostname;
